@@ -1,0 +1,13 @@
+diff --git a/ros_tcp_endpoint/server.py b/ros_tcp_endpoint/server.py
+index 5954994..f55a1ca 100644
+--- a/ros_tcp_endpoint/server.py
++++ b/ros_tcp_endpoint/server.py
+@@ -122,7 +122,7 @@ class TcpServer(Node):
+         if function is None:
+             self.send_unity_error("Don't understand SysCommand.'{}'".format(topic))
+         else:
+-            message_json = data.decode("utf-8")[:-1]
++            message_json = data.decode("utf-8").strip("\x00\r\n\t ")
+             params = json.loads(message_json)
+             function(**params)
+ 
