@@ -45,7 +45,10 @@ def generate_launch_description():
             os.path.join(get_package_share_directory('slam_toolbox'),
                          'launch', 'online_async_launch.py')
         ),
-        launch_arguments={'use_sim_time': use_sim_time}.items(),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'slam_params_file': os.path.join(nav_dir, 'config', 'slam_toolbox_2d.yaml'),
+        }.items(),
     )
 
     # Nav2 stack with 2D parameters
