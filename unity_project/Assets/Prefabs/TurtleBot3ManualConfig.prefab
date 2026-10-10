@@ -486,7 +486,7 @@ MonoBehaviour:
   topic: /scan
   PublishPeriodSeconds: 0.1
   RangeMetersMin: 0.12
-  RangeMetersMax: 100
+  RangeMetersMax: 3.5
   ScanAngleStartDegrees: 0
   ScanAngleEndDegrees: -359
   ScanOffsetAfterPublish: 0

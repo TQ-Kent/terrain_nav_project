@@ -151,12 +151,16 @@ namespace TerrainNavigation.Sensors
                 var directionVector = Quaternion.Euler(0f, yawDegrees, 0f) * Vector3.forward;
                 var measurementStart = RangeMetersMin * directionVector + transform.position;
                 var measurementRay = new Ray(measurementStart, directionVector);
-                var foundValidMeasurement = Physics.Raycast(measurementRay, out var hit, RangeMetersMax);
-                
+                // The ray starts RangeMetersMin out from the sensor, so cast only the remaining
+                // distance and add the offset back to report range from the sensor origin.
+                var foundValidMeasurement = Physics.Raycast(measurementRay, out var hit, RangeMetersMax - RangeMetersMin);
+
+                // REP-117: a beam with no return is +inf. float.MaxValue is not treated as a clear beam
+                // by slam_toolbox or the Nav2 costmaps, so free space was only mapped along beams that hit.
                 if (foundValidMeasurement)
-                    ranges.Add(hit.distance);
+                    ranges.Add(hit.distance + RangeMetersMin);
                 else
-                    ranges.Add(float.MaxValue);
+                    ranges.Add(float.PositiveInfinity);
 
                 ++m_NumMeasurementsTaken;
             }

@@ -215,6 +215,7 @@ local_costmap:
           clearing: true
           marking: true
           data_type: "LaserScan"
+          inf_is_valid: true   # Unity reports no-return beams as +inf; clear free space along them
           raytrace_max_range: 3.5
           raytrace_min_range: 0.12
           obstacle_max_range: 3.0
@@ -255,6 +256,7 @@ global_costmap:
           clearing: true
           marking: true
           data_type: "LaserScan"
+          inf_is_valid: true   # Unity reports no-return beams as +inf; clear free space along them
           raytrace_max_range: 3.5
           raytrace_min_range: 0.12
           obstacle_max_range: 3.0
