@@ -215,6 +215,7 @@ local_costmap:
           clearing: true
           marking: true
           data_type: "LaserScan"
+          inf_is_valid: true   # Unity reports no-return beams as +inf; clear free space along them
           raytrace_max_range: 3.5
           raytrace_min_range: 0.12
           obstacle_max_range: 3.0
@@ -236,10 +237,15 @@ global_costmap:
       robot_radius: 0.22
       resolution: 0.05
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: true
+      # Fixed-size arena instead of a static layer: the SLAM map only covers explored
+      # space, so a static layer rejects goals outside it ("Goal ... was outside bounds").
+      # slam_toolbox still owns map->odom; walls are marked by the obstacle layer.
+      rolling_window: false
+      width: 40
+      height: 40
+      origin_x: -20.0
+      origin_y: -20.0
+      plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
@@ -250,6 +256,7 @@ global_costmap:
           clearing: true
           marking: true
           data_type: "LaserScan"
+          inf_is_valid: true   # Unity reports no-return beams as +inf; clear free space along them
           raytrace_max_range: 3.5
           raytrace_min_range: 0.12
           obstacle_max_range: 3.0
