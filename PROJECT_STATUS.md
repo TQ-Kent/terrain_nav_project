@@ -1,7 +1,7 @@
 # Project Status
 
 Last updated: 2026-10-10. Repo: `~/robotic/terrain_nav_project` (own Git repo; the forked example repo `Robotics-Nav2-SLAM-Example` is separate and not the active work).
-Latest running version: tag `checkpoint-2` (branch `fix/map-update-and-goal-bounds`, commit `c8e8de2`). `checkpoint-1` is the earlier base.
+Latest running version: tag `checkpoint-2` (commit `c8e8de2`), merged into `main` via PR #1. `checkpoint-1` is the earlier base.
 
 ## Goal and architecture
 Compare 2D Nav2 global planners and local controllers at runtime, as a baseline before the paused 3D terrain work.
@@ -56,4 +56,3 @@ Runs end to end in the Unity editor per user report ("test ran successfully" on 
 2. Measure baselines (Unity startup, Nav2 activation, goal times).
 3. Find and fix the stall near obstacles before comparing algorithms.
 4. Build the headless simulator, scenarios and `benchmark_runner.py`; run the planner sweep, then the controller sweep.
-5. Merge `fix/map-update-and-goal-bounds` into `main` once you are happy (not done).
