@@ -31,6 +31,16 @@ def generate_launch_description():
         'controller', default_value='FollowPath',
         description='Initial local controller: FollowPath(DWB) | MPPI | RPP | Graceful')
 
+    params_file_arg = DeclareLaunchArgument(
+        'params_file',
+        default_value=os.path.join(nav_dir, 'config', 'nav2_params_2d.yaml'),
+        description='Nav2 parameter file')
+
+    slam_params_arg = DeclareLaunchArgument(
+        'slam_params_file',
+        default_value=os.path.join(nav_dir, 'config', 'slam_toolbox_2d.yaml'),
+        description='slam_toolbox parameter file')
+
     # Include base simulation bringup (TCP endpoint + RViz)
     simulation_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -47,7 +57,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'slam_params_file': os.path.join(nav_dir, 'config', 'slam_toolbox_2d.yaml'),
+            'slam_params_file': LaunchConfiguration('slam_params_file'),
         }.items(),
     )
 
@@ -59,7 +69,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'params_file': os.path.join(nav_dir, 'config', 'nav2_params_2d.yaml'),
+            'params_file': LaunchConfiguration('params_file'),
         }.items(),
     )
 
@@ -74,6 +84,8 @@ def generate_launch_description():
         use_sim_time_arg,
         planner_arg,
         controller_arg,
+        params_file_arg,
+        slam_params_arg,
         simulation_bringup,
         slam_toolbox,
         nav2_bringup,

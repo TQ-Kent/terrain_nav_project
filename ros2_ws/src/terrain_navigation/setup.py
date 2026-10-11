@@ -33,6 +33,7 @@ setup(
     entry_points={
         'console_scripts': [
             'set_algo = terrain_navigation.set_algo:main',
+            'goal_explorer = terrain_navigation.goal_explorer:main',
         ],
     },
 )

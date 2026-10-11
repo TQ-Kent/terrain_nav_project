@@ -9,6 +9,12 @@
 
   <depend>rclpy</depend>
   <depend>nav2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>action_msgs</depend>
+  <depend>tf2_ros_py</depend>
+  <depend>python3-scipy</depend>
+  <depend>python3-numpy</depend>
 
   <exec_depend>std_msgs</exec_depend>
   <test_depend>ament_copyright</test_depend>

@@ -117,6 +117,27 @@ For each pair, send the same goal from the same start pose and record success, p
 **Pass:** the Nav2 logs show the planner/controller changing and the path shape differs between planners.
 **Not yet verified in this project:** whether the selector topics take effect on a live Nav2; if the path never changes, check `ros2 topic info /planner_selector` for a subscriber from `bt_navigator`.
 
+## Stage 8: Maze with a known goal (unknown map)
+
+Why: with the baseline launch the planner treats unexplored space as free, so in a maze it plans through unseen walls and bounces between dead ends. The maze launch plans only through space SLAM has seen and explores toward the goal.
+
+1. In Unity: **TerrainNav -> Build Maze Scene** (writes `Assets/Scenes/MazeScene.unity`, 6x6 seeded maze, 12.5 m square, 1.5 m corridors; the Console prints the layout and goal). Open the scene and press Play.
+2. Copy-paste run (goal already included: far corner of the maze, ROS x=10, y=-10). Press Play in Unity first:
+```bash
+cd ~/robotic/terrain_nav_project/ros2_ws
+source /opt/ros/jazzy/setup.bash && source install/setup.bash
+ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py goal_x:=10.0 goal_y:=-10.0
+```
+Build first if needed: `colcon build --symlink-install`. Add `planner:=Smac2D controller:=MPPI` to pick algorithms. Other options (all optional; do not type square brackets): `goal_weight:=1.0` (pull of exploration toward the goal, 0 = nearest frontier first), `stall_timeout:=40.0`, `localization:=ground_truth|slam`. The goal is in the map frame, whose origin is the robot start (assumes the robot starts at the origin facing Unity +z).
+3. About 20 s after launch `goal_explorer` starts. Watch its log: `frontier -> (x, y)` lines, then `GOAL -> ...` once the goal is reachable through known space, then `GOAL REACHED`.
+4. The test stops itself: if the robot moves less than 0.15 m for `stall_timeout` seconds (default 40, sim time) `goal_explorer` logs `STALLED`, writes the costmap it used to `/tmp/goal_explorer_stall.npz`, and the whole launch shuts down. Use `stall_timeout:=0` to disable.
+5. `localization:=ground_truth` (default) publishes a static identity `map->odom` (Unity's odom is the true pose) and runs `slam_toolbox` as a pure mapper (`slam_toolbox_2d_gt.yaml`: no scan matching, no loop closure, no TF). Use `localization:=slam` to let `slam_toolbox` localize. In the maze that mode snaps: `map->odom` jumped 1.8 m in 1 s in a long corridor (observed), the robot teleports in RViz, and the costmap splits.
+6. Change algorithms live with `set_algo` as in Stage 7.
+
+**Pass:** the robot reaches the goal without returning into an already-explored dead end.
+**Verified so far:** one end-to-end Unity run with `localization:=ground_truth` reached the goal (10, -10) with default planner/controller; no `map->odom` jumps. `localization:=slam` was observed to fail (see 5). Not yet repeated across planners/controllers or trials; the shutdown-on-goal change was built but not re-run.
+If `goal_explorer` logs `no frontier left and goal unreachable`, check the goal is inside the maze and the start pose matches the assumption above.
+
 ## Quick troubleshooting
 
 | Symptom | Likely cause |
@@ -127,6 +148,7 @@ For each pair, send the same goal from the same start pose and record success, p
 | Nav2 never activates | No TF or `/clock`; `slam_toolbox` has not produced `/map` yet |
 | Robot spins or oscillates | Wheel `trackWidth`/`wheelRadius` mismatch vs. the controller's assumptions |
 | Planner "failed to create plan" | Goal in unknown or inflated space; pick a goal in mapped free space |
+| `malformed launch argument '[planner:='` | Square brackets in a usage line were typed literally; omit them |
 
 ## Problems found while running this guide (2026-10-08) and their fixes
 

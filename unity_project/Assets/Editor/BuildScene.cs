@@ -10,7 +10,14 @@ namespace TerrainNavigation.EditorTools
         [MenuItem("TerrainNav/Build Main Scene")]
         public static void CreateMainScene()
         {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            BuildBase(new Vector3(0, 0.05f, 0), new Vector3(5, 1, 5), new Vector3(0, 5, -10));
+            SaveScene("Assets/Scenes/MainScene.unity");
+        }
+
+        // Light, camera, ground, robot and ROS publisher shared by every scene. Starts a new scene.
+        public static void BuildBase(Vector3 robotPosition, Vector3 groundScale, Vector3 cameraPosition)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             // Directional Light
             var lightGo = new GameObject("Directional Light");
@@ -22,20 +29,20 @@ namespace TerrainNavigation.EditorTools
             var cameraGo = new GameObject("Main Camera");
             var camera = cameraGo.AddComponent<Camera>();
             cameraGo.tag = "MainCamera";
-            cameraGo.transform.position = new Vector3(0, 5, -10);
+            cameraGo.transform.position = cameraPosition;
             cameraGo.transform.LookAt(Vector3.zero);
 
             // Ground Plane
             var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
             plane.name = "Ground";
-            plane.transform.localScale = new Vector3(5, 1, 5);
+            plane.transform.localScale = groundScale;
 
             // TurtleBot3 (includes AGVController, LaserScan, TF and clock publishers)
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/TurtleBot3ManualConfig.prefab");
             if (prefab != null)
             {
                 var robot = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                robot.transform.position = new Vector3(0, 0.05f, 0);
+                robot.transform.position = robotPosition;
             }
             else
             {
@@ -45,17 +52,19 @@ namespace TerrainNavigation.EditorTools
             // ROS Test Publisher GameObject
             var rosTestGo = new GameObject("ROSTestPublisher");
             rosTestGo.AddComponent<ROSTestPublisher>();
+        }
 
-            // Save scene
+        public static void SaveScene(string path)
+        {
             if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
             {
                 AssetDatabase.CreateFolder("Assets", "Scenes");
             }
-            EditorSceneManager.SaveScene(scene, "Assets/Scenes/MainScene.unity");
+            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), path);
 
             // Set as active scene in Build Settings
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/MainScene.unity", true) };
-            Debug.Log("MainScene created and set in Build Settings successfully!");
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true) };
+            Debug.Log(path + " created and set in Build Settings successfully!");
         }
     }
 }
