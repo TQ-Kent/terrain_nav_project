@@ -1,0 +1,8 @@
+speed,speed_0.26,1,reached,156.4,35.16,0.225,44,0,0,182,"rviz=false,exploration.max_time=300,speed.max_linear=0.26,speed.max_angular=1.0,speed.linear_accel=2.5"
+speed,speed_0.26,2,reached,151.27,35.06,0.232,42,0,0,177,"rviz=false,exploration.max_time=300,speed.max_linear=0.26,speed.max_angular=1.0,speed.linear_accel=2.5"
+speed,speed_0.5,1,reached,107.85,36.88,0.342,34,0,0,132,"rviz=false,exploration.max_time=300,speed.max_linear=0.5,speed.max_angular=1.5,speed.linear_accel=1.5"
+speed,speed_0.5,2,stalled,72.0,3.18,0.044,4,0,0,99,"rviz=false,exploration.max_time=300,speed.max_linear=0.5,speed.max_angular=1.5,speed.linear_accel=1.5"
+speed,speed_0.8,1,stalled,66.0,10.15,0.154,11,0,0,92,"rviz=false,exploration.max_time=300,speed.max_linear=0.8,speed.max_angular=2.0,speed.linear_accel=1.5"
+speed,speed_0.8,2,stalled,119.0,28.4,0.239,27,0,0,145,"rviz=false,exploration.max_time=300,speed.max_linear=0.8,speed.max_angular=2.0,speed.linear_accel=1.5"
+speed,speed_1.0,1,stalled,49.0,3.66,0.075,4,0,0,74,"rviz=false,exploration.max_time=300,speed.max_linear=1.0,speed.max_angular=2.0,speed.linear_accel=2.0"
+speed,speed_1.0,2,stalled,68.0,10.97,0.161,10,0,0,93,"rviz=false,exploration.max_time=300,speed.max_linear=1.0,speed.max_angular=2.0,speed.linear_accel=2.0"

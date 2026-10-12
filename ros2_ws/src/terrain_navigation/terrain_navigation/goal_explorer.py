@@ -6,6 +6,7 @@ frontier_logic). Once the goal is reachable it sends the goal itself.
 
     ros2 run terrain_navigation goal_explorer --ros-args -p goal_x:=10.0 -p goal_y:=-10.0
 """
+import json
 import math
 import time
 
@@ -35,9 +36,18 @@ class GoalExplorer(Node):
         self.declare_parameter('switch_margin', 1.0)     # m of score gain needed to change target
         self.declare_parameter('blacklist_seconds', 30.0)
         self.declare_parameter('goal_tolerance', 0.25)
+        self.declare_parameter('mode', 'frontier')       # frontier | direct (old behaviour: send the goal at once)
+        self.declare_parameter('max_time', 0.0)          # s (sim time) after which the test ends as 'timeout'; 0 = off
+        self.declare_parameter('result_file', '')       # JSON summary written when the test ends
         self.declare_parameter('stall_timeout', 40.0)    # s (sim time) without moving; 0 disables
         self.declare_parameter('stall_distance', 0.15)   # m that counts as moving
         self.last_view = None
+        self.t_start = None                              # sim time of the first goal sent
+        self.path_length = 0.0
+        self.last_sample = None
+        self.n_frontier_goals = 0
+        self.n_failed = 0
+        self.create_timer(0.2, self.sample_path)
         self.last_move = None                            # (x, y, time) of last significant move
         self.goal = (self.get_parameter('goal_x').value, self.get_parameter('goal_y').value)
 
@@ -95,6 +105,10 @@ class GoalExplorer(Node):
         self.get_logger().info(
             f'{"GOAL" if is_goal else "frontier"} -> ({xy[0]:.2f}, {xy[1]:.2f})')
         self.seq += 1
+        if self.t_start is None:
+            self.t_start = self.now_s()
+        if not is_goal:
+            self.n_frontier_goals += 1
         seq = self.seq
         self.client.send_goal_async(goal_msg).add_done_callback(
             lambda f: self.on_accepted(f, seq))
@@ -121,6 +135,7 @@ class GoalExplorer(Node):
             self.fail_target(f'status {status}')
 
     def fail_target(self, why):
+        self.n_failed += 1
         if self.target is not None:
             self.get_logger().warn(f'target failed ({why}); blacklisting it')
             if not self.target_is_goal:
@@ -128,9 +143,38 @@ class GoalExplorer(Node):
                 self.blacklist.append((*self.target, expiry))
         self.target = None
 
-    def finish(self):
+    def finish(self, outcome='reached'):
+        self.write_result(outcome)
         self.done = True
         rclpy.try_shutdown()                            # the launch file ends the test with this node
+
+    def now_s(self):
+        return self.get_clock().now().nanoseconds * 1e-9
+
+    def sample_path(self):
+        if self.done or self.t_start is None:
+            return
+        pos = self.robot_xy()
+        if pos is None:
+            return
+        if self.last_sample is not None:
+            d = math.hypot(pos[0] - self.last_sample[0], pos[1] - self.last_sample[1])
+            if d < 1.0:                                  # ignore a localisation jump
+                self.path_length += d
+        self.last_sample = pos
+
+    def write_result(self, outcome):
+        t = self.now_s() - self.t_start if self.t_start is not None else 0.0
+        result = {'outcome': outcome, 'sim_time_s': round(t, 2),
+                  'path_m': round(self.path_length, 2),
+                  'avg_speed_mps': round(self.path_length / t, 3) if t > 0 else 0.0,
+                  'frontier_goals': self.n_frontier_goals, 'failed_targets': self.n_failed,
+                  'goal': list(self.goal)}
+        self.get_logger().info(f'RESULT {json.dumps(result)}')
+        path = self.get_parameter('result_file').value
+        if path:
+            with open(path, 'w') as f:
+                json.dump(result, f)
 
     def check_stall(self, robot):
         """Stop the test when the robot has not moved for stall_timeout seconds."""
@@ -146,6 +190,7 @@ class GoalExplorer(Node):
                 f'STALLED: robot at ({robot[0]:.2f}, {robot[1]:.2f}) has not moved '
                 f'{timeout:.0f} s; stopping the test')
             self.dump_view(robot)
+            self.write_result('stalled')
             self.done = True
             rclpy.try_shutdown()
             return True
@@ -170,10 +215,22 @@ class GoalExplorer(Node):
             return
         if self.check_stall(robot):
             return
+        max_time = self.get_parameter('max_time').value
+        if max_time > 0 and self.t_start is not None and self.now_s() - self.t_start > max_time:
+            self.get_logger().error(f'TIMEOUT after {max_time:.0f} s; stopping the test')
+            self.finish('timeout')
+            return
         if math.hypot(robot[0] - self.goal[0], robot[1] - self.goal[1]) < \
                 self.get_parameter('goal_tolerance').value:
             self.get_logger().info('GOAL REACHED')
             self.finish()
+            return
+
+        if self.get_parameter('mode').value == 'direct':
+            # Old behaviour: hand the goal straight to Nav2, whatever the map looks like.
+            if self.target is None and time.time() - getattr(self, 'last_direct', 0.0) > 5.0:
+                self.last_direct = time.time()
+                self.send((0, 0), self.goal, robot, True)
             return
 
         info = self.map.info

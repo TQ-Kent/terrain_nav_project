@@ -1,0 +1,60 @@
+# Single control file for the maze test (bringup_maze_2d.launch.py).
+# Edit values here, or override any value at launch without editing the file:
+#   ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py set:=speed.max_linear=0.8,exploration.goal_weight=2
+# Use another file with  config:=/path/to/file.yaml
+
+goal:
+  x: 10.0                 # map frame (m); map origin = robot start pose
+  y: -10.0                # default = far corner cell of MazeScene
+
+algorithms:
+  planner: GridBased      # GridBased | Smac2D | SmacHybrid | ThetaStar
+  controller: FollowPath  # FollowPath (DWB) | MPPI | RPP | Graceful
+
+nav2_profile: maze          # maze (static layer, plans only through seen space) | baseline_2d (checkpoint-2: fixed
+                            # 40x40 m costmap, unknown space treated as free)
+localization: ground_truth  # ground_truth (static identity map->odom) | slam (slam_toolbox localizes; snaps in corridors)
+simulator: unity            # unity (needs Unity in Play) | headless (built-in Python simulator, no Unity)
+rviz: true
+
+# Speeds are written into DWB, MPPI, RPP, Graceful and velocity_smoother at launch.
+# Unity caps the real robot at AGVController maxLinearSpeed / maxRotationalSpeed on the robot
+# prefab (now 1.0 m/s and 2.0 rad/s); asking Nav2 for more than that has no effect in Unity.
+speed:
+  max_linear: 0.5         # m/s   (TurtleBot3 stock value is 0.26)
+  max_reverse: 0.1        # m/s   backward speed allowed
+  max_angular: 1.5        # rad/s
+  linear_accel: 1.5       # m/s^2   (also used as deceleration)
+  angular_accel: 3.2      # rad/s^2
+  collision_lookahead: 0.31  # m the collision monitor looks ahead (1.2 s x 0.26 m/s, the stock value);
+                          # converted to time_before_collision = max(0.4 s, lookahead / max_linear)
+
+# Goal tolerances written into the Nav2 goal checker. The final heading is irrelevant for this
+# test, so yaw is wide open: otherwise a goal a few cm away makes the robot rotate in place,
+# the progress checker (needs progress_radius of movement in 10 s) aborts it, and the test stalls.
+tolerance:
+  xy: 0.25                # m
+  yaw: 6.3                # rad (>= pi disables the heading requirement)
+  progress_radius: 0.15   # m of movement within 10 s that counts as progress
+
+exploration:              # goal_explorer node
+  mode: frontier          # frontier (explore toward goal) | direct (checkpoint-2 behaviour: send the goal at once)
+  max_time: 0.0           # s (sim time) before the test ends as 'timeout'; 0 = off
+  goal_weight: 1.0        # pull toward the goal when ranking frontiers (0 = nearest frontier)
+  clearance: 0.05         # m extra distance from costmap obstacles
+  min_frontier_cells: 3
+  switch_margin: 1.0      # m of score gain needed before switching frontier
+  blacklist_seconds: 30.0
+  goal_tolerance: 0.25    # m
+  stall_timeout: 40.0     # s (sim time) without moving before the test stops; 0 disables
+  stall_distance: 0.15    # m that counts as moving
+  start_delay: 20.0       # s after launch before exploration starts (Nav2 start-up)
+  result_file: ""         # JSON summary (outcome, sim time, path length, speed) is written here when set
+
+headless:                 # only used when simulator: headless
+  realtime_factor: 1.0    # >1 runs faster than real time if the CPU keeps up
+  robot_radius: 0.2       # m collision circle
+  max_linear: 1.0         # m/s  (mirrors the Unity prefab cap)
+  max_angular: 2.0        # rad/s
+  linear_accel: 2.0       # m/s^2
+  angular_accel: 6.0      # rad/s^2

@@ -41,12 +41,19 @@ def generate_launch_description():
         default_value=os.path.join(nav_dir, 'config', 'slam_toolbox_2d.yaml'),
         description='slam_toolbox parameter file')
 
+    use_endpoint_arg = DeclareLaunchArgument('use_endpoint', default_value='true')
+    use_rviz_arg = DeclareLaunchArgument('use_rviz', default_value='true')
+
     # Include base simulation bringup (TCP endpoint + RViz)
     simulation_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(bringup_dir, 'launch', 'bringup_simulation.launch.py')
         ),
-        launch_arguments={'use_sim_time': use_sim_time}.items(),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'use_endpoint': LaunchConfiguration('use_endpoint'),
+            'use_rviz': LaunchConfiguration('use_rviz'),
+        }.items(),
     )
 
     # SLAM Toolbox (online async mode)
@@ -86,6 +93,8 @@ def generate_launch_description():
         controller_arg,
         params_file_arg,
         slam_params_arg,
+        use_endpoint_arg,
+        use_rviz_arg,
         simulation_bringup,
         slam_toolbox,
         nav2_bringup,

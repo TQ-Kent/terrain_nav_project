@@ -1022,8 +1022,8 @@ MonoBehaviour:
   wheel1: {fileID: 1872241788401015674}
   wheel2: {fileID: 1872241788258955036}
   mode: 1
-  maxLinearSpeed: 0.8
-  maxRotationalSpeed: 0.5
+  maxLinearSpeed: 1
+  maxRotationalSpeed: 2
   wheelRadius: 0.033
   trackWidth: 0.288
   forceLimit: 10

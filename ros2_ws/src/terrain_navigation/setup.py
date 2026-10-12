@@ -15,6 +15,9 @@ setup(
         # Nav2 config files
         (os.path.join('share', package_name, 'config'),
             glob(os.path.join('config', '*.yaml'))),
+        # Maze layouts for the headless simulator
+        (os.path.join('share', package_name, 'maps'),
+            glob(os.path.join('maps', '*.txt'))),
         # Behavior tree XMLs
         (os.path.join('share', package_name, 'behavior_trees'),
             glob(os.path.join('behavior_trees', '*.xml'))),
@@ -34,6 +37,7 @@ setup(
         'console_scripts': [
             'set_algo = terrain_navigation.set_algo:main',
             'goal_explorer = terrain_navigation.goal_explorer:main',
+            'headless_sim = terrain_navigation.headless_sim:main',
         ],
     },
 )

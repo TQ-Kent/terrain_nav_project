@@ -80,6 +80,11 @@ namespace TerrainNavigation.EditorTools
             goal.transform.localScale = new Vector3(0.6f, 0.01f, 0.6f);
             goal.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = Color.green };
 
+            // Timer + path trace on the robot (the object that carries AGVController).
+            var agv = Object.FindFirstObjectByType<TerrainNavigation.Kinematics.AGVController>();
+            if (agv != null) agv.gameObject.AddComponent<TerrainNavigation.Tools.RunTracker>().goal = goal.transform;
+            else Debug.LogWarning("BuildMazeScene: no AGVController found; RunTracker not added.");
+
             BuildScene.SaveScene("Assets/Scenes/MazeScene.unity");
 
             // Unity (x right, z forward) -> ROS (x forward, y left): ros_x = z, ros_y = -x.

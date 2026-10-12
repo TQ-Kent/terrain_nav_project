@@ -1,0 +1,28 @@
+// Unity MazeScene layout (seed 42), copied from the Unity Console output of
+// TerrainNav > Build Maze Scene. One character = 0.5 m, '#' = wall.
+// Top row = far z (ROS +x end). Unity (x, z) -> ROS (x=z, y=-x); cell (0,0) is centred on the origin.
+#########################
+#           #           #
+#           #           #
+#           #           #
+#   #   #   #   #########
+#       #               #
+#       #               #
+#       #               #
+#   #############   #   #
+#                   #   #
+#                   #   #
+#                   #   #
+#   #################   #
+#       #           #   #
+#       #           #   #
+#       #           #   #
+#########   #####   #   #
+#           #       #   #
+#           #       #   #
+#           #       #   #
+#   #########   #####   #
+#   #                   #
+#   #                   #
+#   #                   #
+#########################
