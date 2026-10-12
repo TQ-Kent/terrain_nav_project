@@ -42,6 +42,7 @@ exploration:              # goal_explorer node
   max_time: 0.0           # s (sim time) before the test ends as 'timeout'; 0 = off
   goal_weight: 1.0        # pull toward the goal when ranking frontiers (0 = nearest frontier)
   clearance: 0.05         # m extra distance from costmap obstacles
+  tick_period: 0.25       # s between planning cycles (also re-plans at once when a target is reached)
   min_frontier_cells: 3
   switch_margin: 1.0      # m of score gain needed before switching frontier
   blacklist_seconds: 30.0

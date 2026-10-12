@@ -25,7 +25,7 @@ namespace TerrainNavigation.Sensors
         [FormerlySerializedAs("TimeBetweenScansSeconds")]
         public double PublishPeriodSeconds = 0.1;
         public float RangeMetersMin = 0.12f;
-        public float RangeMetersMax = 3.5f;
+        public float RangeMetersMax = 10f;
         public float ScanAngleStartDegrees = -180f;
         public float ScanAngleEndDegrees = 180f;
         public float ScanOffsetAfterPublish = 0f;
@@ -100,7 +100,7 @@ namespace TerrainNavigation.Sensors
                 range_max = RangeMetersMax,
                 angle_min = angleStartRos,
                 angle_max = angleEndRos,
-                angle_increment = (angleEndRos - angleStartRos) / NumMeasurementsPerScan,
+                angle_increment = (angleEndRos - angleStartRos) / (NumMeasurementsPerScan - 1), // first and last beam are on the end angles
                 time_increment = TimeBetweenMeasurementsSeconds,
                 scan_time = (float)PublishPeriodSeconds,
                 intensities = new float[ranges.Count],
@@ -145,7 +145,7 @@ namespace TerrainNavigation.Sensors
             var yawBaseDegrees = transform.rotation.eulerAngles.y;
             while (m_NumMeasurementsTaken < measurementsSoFar)
             {
-                var t = m_NumMeasurementsTaken / (float)NumMeasurementsPerScan;
+                var t = m_NumMeasurementsTaken / (float)(NumMeasurementsPerScan - 1); // matches angle_increment above
                 var yawSensorDegrees = Mathf.Lerp(m_CurrentScanAngleStart, m_CurrentScanAngleEnd, t);
                 var yawDegrees = yawBaseDegrees + yawSensorDegrees;
                 var directionVector = Quaternion.Euler(0f, yawDegrees, 0f) * Vector3.forward;

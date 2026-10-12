@@ -10,10 +10,10 @@ so the robot cannot cycle back into it. Among the frontiers, the one minimising
 is chosen, so exploration is pulled toward the goal without ever planning through
 unknown space.
 """
-from collections import deque
-
 import numpy as np
 from scipy import ndimage
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import shortest_path
 
 OCC_THRESH = 50          # occupancy >= this is an obstacle
 EIGHT = np.ones((3, 3), dtype=bool)
@@ -33,20 +33,26 @@ def safe_cells(grid, clearance_cells, occ_thresh=OCC_THRESH):
 
 
 def path_distance(safe, start):
-    """4-connected BFS step count from `start` (row, col) over `safe`; -1 if unreachable."""
+    """4-connected step count from `start` (row, col) over `safe`; -1 if unreachable.
+
+    Unweighted shortest paths from scipy's C implementation (a pure-Python BFS took 0.15-0.4 s
+    per call on a 12 m maze, which left the robot idle between goals)."""
     h, w = safe.shape
     dist = np.full((h, w), -1, dtype=np.int32)
     if not (0 <= start[0] < h and 0 <= start[1] < w):
         return dist
-    dist[start] = 0
-    queue = deque([start])
-    while queue:
-        r, c = queue.popleft()
-        d = dist[r, c] + 1
-        for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
-            if 0 <= nr < h and 0 <= nc < w and dist[nr, nc] < 0 and safe[nr, nc]:
-                dist[nr, nc] = d
-                queue.append((nr, nc))
+    idx = np.arange(h * w).reshape(h, w)
+    s = safe.copy()
+    s[start] = True
+    right = s[:, :-1] & s[:, 1:]
+    down = s[:-1, :] & s[1:, :]
+    rows = np.concatenate([idx[:, :-1][right], idx[:-1, :][down]])
+    cols = np.concatenate([idx[:, 1:][right], idx[1:, :][down]])
+    graph = csr_matrix((np.ones(len(rows), dtype=np.float32), (rows, cols)), shape=(h * w, h * w))
+    d = shortest_path(graph, method='D', directed=False, unweighted=True,
+                      indices=int(idx[start]))
+    reached = np.isfinite(d).reshape(h, w)
+    dist[reached] = d.reshape(h, w)[reached].astype(np.int32)
     return dist
 
 
@@ -111,6 +117,29 @@ def _best_frontier(grid, robot_cell, goal_cell, resolution, clearance_m, min_siz
         if s < best_s:
             best, best_s = rep, s
     return best, best_s, bool(g_ok), dist, safe
+
+
+def escape_cell(grid, cell, clearance_cells, occ_thresh=OCC_THRESH, max_cells=40, avoid=()):
+    """Nearest known-free cell with full clearance, for a robot sitting in the obstacle/inflation band.
+
+    best_frontier() finds nothing when the robot's own cell is at lethal cost (it is wedged against a
+    wall), so exploration would stop for good. Returns (row, col) or None if nothing is within
+    `max_cells`. `avoid` lists (row, col) cells to skip (earlier failed escapes)."""
+    safe = safe_cells(grid, clearance_cells, occ_thresh)
+    h, w = safe.shape
+    if not (0 <= cell[0] < h and 0 <= cell[1] < w) or safe[cell]:
+        return None                                       # not stuck
+    r0, r1 = max(cell[0] - max_cells, 0), min(cell[0] + max_cells + 1, h)
+    c0, c1 = max(cell[1] - max_cells, 0), min(cell[1] + max_cells + 1, w)
+    window = safe[r0:r1, c0:c1].copy()
+    for a in avoid:
+        window[max(a[0] - r0 - 5, 0):max(a[0] - r0 + 6, 0), max(a[1] - c0 - 5, 0):max(a[1] - c0 + 6, 0)] = False
+    cells = np.argwhere(window)
+    if len(cells) == 0:
+        return None
+    cells += (r0, c0)
+    d = ((cells - np.array(cell)) ** 2).sum(axis=1)
+    return tuple(int(v) for v in cells[np.argmin(d)])
 
 
 def find_frontier_near(grid, safe, dist, cell, radius_cells=10):

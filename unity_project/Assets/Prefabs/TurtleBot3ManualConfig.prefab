@@ -486,11 +486,11 @@ MonoBehaviour:
   topic: /scan
   PublishPeriodSeconds: 0.1
   RangeMetersMin: 0.12
-  RangeMetersMax: 3.5
+  RangeMetersMax: 10
   ScanAngleStartDegrees: 0
   ScanAngleEndDegrees: -359
   ScanOffsetAfterPublish: 0
-  NumMeasurementsPerScan: 180
+  NumMeasurementsPerScan: 360
   TimeBetweenMeasurementsSeconds: 0
   markerPrefab: {fileID: 7151730531324999659, guid: 6fd54caedc5cc354088d86e85c957664, type: 3}
   LayerMaskName: TurtleBot3Manual

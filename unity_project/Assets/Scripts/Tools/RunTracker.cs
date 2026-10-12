@@ -16,6 +16,9 @@ namespace TerrainNavigation.Tools
         public float lineWidth = 0.06f;
         public Color lineColor = Color.red;
 
+        ArticulationBody rootBody;
+        Vector3 homePos;
+        Quaternion homeRot;
         Transform tracked;                      // the transform that really moves (see Start)
         LineRenderer line;
         Vector3 startPos, lastPoint;
@@ -28,7 +31,9 @@ namespace TerrainNavigation.Tools
             // be a child of the object this script sits on. Track that one, else the timer never starts.
             tracked = transform;
             foreach (var b in GetComponentsInChildren<ArticulationBody>())
-                if (b.isRoot) { tracked = b.transform; break; }
+                if (b.isRoot) { tracked = b.transform; rootBody = b; break; }
+            homePos = tracked.position;
+            homeRot = tracked.rotation;
             Debug.Log($"RunTracker: tracking '{tracked.name}'");
 
             if (goal == null)
@@ -52,11 +57,33 @@ namespace TerrainNavigation.Tools
 
         void ResetRun()
         {
+            ReturnToStart();
             running = finished = false;
             elapsed = pathLength = 0f;
             startPos = lastPoint = tracked.position;
             line.positionCount = 0;
             AddPoint(tracked.position);
+        }
+
+        // Put the robot back on its original pose and stop it. Articulation bodies must be teleported
+        // with TeleportRoot; setting transform.position would be overwritten by the physics.
+        void ReturnToStart()
+        {
+            if (rootBody != null)
+            {
+                rootBody.TeleportRoot(homePos, homeRot);
+                rootBody.linearVelocity = Vector3.zero;
+                rootBody.angularVelocity = Vector3.zero;
+                foreach (var b in GetComponentsInChildren<ArticulationBody>())
+                {
+                    if (b.isRoot) continue;
+                    if (b.dofCount == 1) b.jointVelocity = new ArticulationReducedSpace(0f);
+                    else if (b.dofCount == 2) b.jointVelocity = new ArticulationReducedSpace(0f, 0f);
+                    else if (b.dofCount == 3) b.jointVelocity = new ArticulationReducedSpace(0f, 0f, 0f);
+                }
+            }
+            else
+                tracked.SetPositionAndRotation(homePos, homeRot);
         }
 
         void AddPoint(Vector3 p)

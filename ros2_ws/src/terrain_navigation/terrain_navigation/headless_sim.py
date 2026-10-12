@@ -1,6 +1,6 @@
 """Headless stand-in for the Unity maze scene (no Unity needed).
 
-Provides what Unity provides: /clock, /scan (180 beams over 0..359 deg, 10 Hz, 0.12-3.5 m,
+Provides what Unity provides: /clock, /scan (360 beams over 0..359 deg, 10 Hz, 0.12-10 m,
 misses as +inf), TF odom->base_footprint->base_link->base_scan from the true pose, and it
 drives from /cmd_vel with speed caps, acceleration limits and a 0.5 s command timeout.
 Walls come from maps/maze_seed42.txt (same layout Unity builds). It also publishes the true
@@ -63,11 +63,11 @@ class HeadlessSim(Node):
         self.in_contact = False
         self.distance = 0.0
 
-        n = 180
+        n = 360
         self.angle_min, self.angle_max = 0.0, math.radians(359.0)
-        self.increment = (self.angle_max - self.angle_min) / n
+        self.increment = (self.angle_max - self.angle_min) / (n - 1)   # first and last beam on the end angles, so slam_toolbox counts n beams
         self.beam_angles = self.angle_min + self.increment * np.arange(n)
-        self.steps = np.arange(0.12, 3.5, 0.01)
+        self.steps = np.arange(0.12, 10.0, 0.01)
 
         self.clock_pub = self.create_publisher(Clock, '/clock', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/scan', 10)
@@ -180,7 +180,7 @@ class HeadlessSim(Node):
         msg.header.stamp, msg.header.frame_id = stamp, 'base_scan'
         msg.angle_min, msg.angle_max = self.angle_min, self.angle_max
         msg.angle_increment = self.increment
-        msg.scan_time, msg.range_min, msg.range_max = 0.1, 0.12, 3.5
+        msg.scan_time, msg.range_min, msg.range_max = 0.1, 0.12, 10.0
         msg.ranges = ranges.tolist()
         self.scan_pub.publish(msg)
 

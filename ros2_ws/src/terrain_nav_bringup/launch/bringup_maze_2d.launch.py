@@ -1,6 +1,6 @@
 import os
 from launch import LaunchDescription
-from launch.actions import (IncludeLaunchDescription, DeclareLaunchArgument, TimerAction,
+from launch.actions import (SetEnvironmentVariable, IncludeLaunchDescription, DeclareLaunchArgument, TimerAction,
                             RegisterEventHandler, Shutdown, OpaqueFunction)
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -101,4 +101,7 @@ def generate_launch_description():
         'simulator': 'override simulator: unity | headless',
     }
     args = [DeclareLaunchArgument(k, default_value='', description=v) for k, v in helps.items()]
-    return LaunchDescription(args + [OpaqueFunction(function=_setup)])
+    # Keep this test off the LAN: another machine's ROS 2 nodes (a UR arm Gazebo/MoveIt sim with its own
+    # /clock and /tf) share domain 0 here and corrupted the clock (TF "jump back in time", TF_OLD_DATA).
+    return LaunchDescription([SetEnvironmentVariable('ROS_LOCALHOST_ONLY', '1')] + args
+                             + [OpaqueFunction(function=_setup)])

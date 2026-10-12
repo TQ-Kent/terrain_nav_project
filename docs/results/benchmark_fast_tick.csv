@@ -1,0 +1,2 @@
+group,name,trial,outcome,sim_time_s,path_m,avg_speed_mps,frontier_goals,failed_targets,wall_contacts,wall_s,overrides
+speed,speed_0.26,1,wall_timeout,,,,,,0,492,"rviz=false,exploration.max_time=300,speed.max_linear=0.26,speed.max_angular=1.0,speed.linear_accel=2.5"

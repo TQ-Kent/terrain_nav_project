@@ -36,6 +36,7 @@ class GoalExplorer(Node):
         self.declare_parameter('switch_margin', 1.0)     # m of score gain needed to change target
         self.declare_parameter('blacklist_seconds', 30.0)
         self.declare_parameter('goal_tolerance', 0.25)
+        self.declare_parameter('tick_period', 0.25)      # s between planning cycles (was 1.0; a cycle takes ~20 ms)
         self.declare_parameter('mode', 'frontier')       # frontier | direct (old behaviour: send the goal at once)
         self.declare_parameter('max_time', 0.0)          # s (sim time) after which the test ends as 'timeout'; 0 = off
         self.declare_parameter('result_file', '')       # JSON summary written when the test ends
@@ -67,7 +68,7 @@ class GoalExplorer(Node):
         self.seq = 0                  # id of the latest goal sent; older results are ignored
         self.blacklist = []           # (row, col, expiry)
         self.done = False
-        self.create_timer(1.0, self.tick)
+        self.create_timer(self.get_parameter('tick_period').value, self.tick)
         self.get_logger().info(f'Goal {self.goal} (map frame); waiting for the global costmap and Nav2')
 
     def on_map(self, msg):
@@ -131,6 +132,7 @@ class GoalExplorer(Node):
                 self.get_logger().info('GOAL REACHED')
                 self.finish()
             self.target = None
+            self.tick()                                 # pick the next frontier now, not at the next timer tick
         elif status != GoalStatus.STATUS_CANCELED:
             self.fail_target(f'status {status}')
 
@@ -251,6 +253,15 @@ class GoalExplorer(Node):
             if not self.target_is_goal or self.target is None:
                 self.send(goal_cell, self.goal, robot, True)
             return
+        if best is None and self.target is None:
+            # Wedged against a wall (robot cell at obstacle cost): nothing is reachable from here, so first
+            # drive to the nearest clear cell. Without this the test sat at "no frontier left" until stall.
+            esc = fl.escape_cell(grid, robot_cell, self.get_parameter('clearance').value / info.resolution,
+                                 occ_thresh=99, avoid=[(b[0], b[1]) for b in self.blacklist])
+            if esc is not None:
+                self.get_logger().warn('robot is inside the obstacle band; escaping to the nearest clear cell')
+                self.send(esc, self.to_xy(esc), robot, False)
+                return
         if best is None:
             if self.target is None:
                 self.get_logger().warn('no frontier left and goal unreachable', throttle_duration_sec=10.0)
