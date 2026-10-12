@@ -138,6 +138,60 @@ Build first if needed: `colcon build --symlink-install`. Add `planner:=Smac2D co
 **Verified so far:** one end-to-end Unity run with `localization:=ground_truth` reached the goal (10, -10) with default planner/controller; no `map->odom` jumps. `localization:=slam` was observed to fail (see 5). Not yet repeated across planners/controllers or trials; the shutdown-on-goal change was built but not re-run.
 If `goal_explorer` logs `no frontier left and goal unreachable`, check the goal is inside the maze and the start pose matches the assumption above.
 
+### Stage 8a: Setting the robot speed
+
+Speed is not a launch argument. It lives in one file and the launch writes it into every controller (DWB, MPPI, RPP, Graceful) and the velocity smoother, so all four use the same limit.
+
+**Permanent change:** edit the `speed:` block of `ros2_ws/src/terrain_nav_bringup/config/maze_test.yaml`, then relaunch (no rebuild needed with `--symlink-install`).
+
+**One-off change (nothing is edited):** pass `set:=` on the launch line. Several values are comma-separated with no spaces:
+```bash
+ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py \
+  set:=speed.max_linear=0.8,speed.max_angular=2.0,speed.linear_accel=1.5
+```
+
+| Key | Unit | Meaning |
+| :-- | :-- | :-- |
+| `speed.max_linear` | m/s | top forward speed |
+| `speed.max_reverse` | m/s | backward speed allowed (0.1) |
+| `speed.max_angular` | rad/s | top turn rate |
+| `speed.linear_accel` | m/s^2 | forward acceleration, also used for braking |
+| `speed.angular_accel` | rad/s^2 | turn acceleration |
+| `speed.collision_lookahead` | m | how far ahead the collision monitor looks (converted to a time from the speed) |
+
+**Unity caps the speed:** `AGVController` on the robot prefab has `maxLinearSpeed` 1.0 m/s and `maxRotationalSpeed` 2.0 rad/s. Asking Nav2 for more has no effect. To go faster, raise those two values on the prefab (and then `speed.*`), and re-test: nothing above 1.0 m/s has been tried.
+
+**Combinations used so far (Unity, maze seed 42, goal (10, -10), one run each, 2026-10-12):**
+
+| `max_linear` | `max_angular` | `linear_accel` | Time to goal | Average speed |
+| --: | --: | --: | --: | --: |
+| 0.5 | 1.5 | 1.5 | 72.7 s | 0.48 m/s |
+| 0.8 | 2.0 | 1.5 | 63.5 s | 0.68 m/s |
+| 1.0 | 2.0 | 2.0 | 56.0 s | 0.73 m/s |
+
+The 0.8 and 1.0 runs took longer routes (43 m and 41 m against 35 m), so time does not fall in proportion to speed.
+
+**Other settings that limit how fast it can drive** (all in `maze_test.yaml` or the Nav2 params): the lidar range (Unity `LaserScanSensor.RangeMetersMax`, now 10 m; the costmap and SLAM ranges are set to match), the local costmap size (`nav2_params_maze.yaml`, 6 x 6 m), and the explorer loop `exploration.tick_period` (0.25 s).
+
+### Stage 8b: Running the test and why the launch stops
+
+Each run, in this order:
+1. Stop Play, wait for the compile with no red errors (**do not save scripts while Play is on**: Unity's ROS publishers do not re-register after a recompile), press Play. The robot starts at the start pose.
+2. Launch the ROS side. The launch sets `ROS_LOCALHOST_ONLY=1` itself, so ROS nodes on other machines on the network (a UR arm simulator was found on this LAN, publishing its own `/clock`) cannot disturb the run. In a separate terminal, run `export ROS_LOCALHOST_ONLY=1` before any `ros2 topic` command, or you will see those foreign nodes.
+3. To repeat a run without restarting Play, click the Game view and press **R**: the robot returns to its start pose and the timer and path line reset. Relaunch ROS afterwards (its map is not reset).
+
+The whole launch shuts down when `goal_explorer` exits, which is how the test ends. The reason is in its log:
+
+| Log line | Meaning |
+| :-- | :-- |
+| `GOAL REACHED` | the robot is within `exploration.goal_tolerance` (0.25 m) of the goal, by the ROS-side position. The launch then stops, so the robot stops about 0.25 m from the marker centre. |
+| `STALLED: ... has not moved 40 s` | moved less than 0.15 m for `stall_timeout` seconds; the costmap is saved to `/tmp/goal_explorer_stall.npz` |
+| `TIMEOUT after N s` | `exploration.max_time` reached (0 = no limit) |
+
+If the launch ends before the robot reaches the goal, read the last lines of the launch output for one of these three. A stall at the very start with a completely unknown costmap means no scans arrived: look for `LaserRangeScan contains ... expected ...` from `slam_toolbox`, or `Not registered to publish topic` from the endpoint (the Unity publishers did not register: restart Play).
+
+A summary of every run (outcome, time, path, speed) is written to `exploration.result_file` when it is set, for example `set:=exploration.result_file=/tmp/run.json`.
+
 ## Quick troubleshooting
 
 | Symptom | Likely cause |

@@ -4,13 +4,16 @@ namespace TerrainNavigation.Tools
 {
     /// <summary>
     /// Maze run timer and path trace. Put it on the robot. The timer starts when the robot first moves
-    /// and stops when it is within goalTolerance (m, horizontal) of the goal; a line is drawn along the
+    /// and stops when it is within goalRadius (m, horizontal) of the goal; a line is drawn along the
     /// robot's path. Press R to clear the trace and reset the timer.
     /// </summary>
     public class RunTracker : MonoBehaviour
     {
         public Transform goal;                  // defaults to the object named "GoalMarker"
-        public float goalTolerance = 0.25f;     // same as tolerance.xy in maze_test.yaml
+        // Wider than tolerance.xy (0.25 m) in maze_test.yaml: ROS ends the test at 0.25 m by its own TF
+        // reading, then cmd_vel stops and the robot can come to rest a few cm outside a 0.25 m circle,
+        // which left the timer running. (New field name: the scene still stores the old goalTolerance.)
+        public float goalRadius = 0.4f;
         public float startMoveDistance = 0.05f; // movement that starts the timer
         public float sampleDistance = 0.05f;    // minimum spacing of trace points
         public float lineWidth = 0.06f;
@@ -118,7 +121,7 @@ namespace TerrainNavigation.Tools
             {
                 var d = pos - goal.position;
                 d.y = 0;
-                if (d.magnitude <= goalTolerance)
+                if (d.magnitude <= goalRadius)
                 {
                     finished = true;
                     AddPoint(pos);

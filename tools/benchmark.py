@@ -51,6 +51,11 @@ def suite():
         runs.append(('controller', f'ctrl_{c}', 1, f'{COMMON},{speed(0.5)},algorithms.controller={c}'))
     for p in ('GridBased', 'Smac2D', 'SmacHybrid', 'ThetaStar'):
         runs.append(('planner', f'plan_{p}', 1, f'{COMMON},{speed(0.5)},algorithms.planner={p}'))
+    # Every planner x controller pair at the Unity speed cap, 2 trials each.
+    for p in ('GridBased', 'Smac2D', 'SmacHybrid', 'ThetaStar'):
+        for c in ('FollowPath', 'MPPI', 'RPP', 'Graceful'):
+            runs.append(('combo', f'{p}+{c}', 2,
+                         f'{COMMON},{speed(1.0)},algorithms.planner={p},algorithms.controller={c}'))
     return runs
 
 
@@ -89,7 +94,7 @@ def run_trial(group, name, trial, overrides, logdir, wall_limit):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--only', choices=['version', 'speed', 'controller', 'planner'])
+    ap.add_argument('--only', choices=['version', 'speed', 'controller', 'planner', 'combo'])
     ap.add_argument('--out', default=os.path.join(ROOT, 'docs', 'results', 'benchmark.csv'))
     ap.add_argument('--logdir', default='/tmp/terrain_bench')
     ap.add_argument('--wall-limit', type=int, default=480)
