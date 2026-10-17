@@ -81,7 +81,7 @@ Pairs with 0 of 2 reached: GridBased+FollowPath, ThetaStar+Graceful.
 - **Path length barely depends on the pair.** Means were 32–39 m for every pair that reached the goal; the maze and the explorer decide most of the route. Time differs far more, from 42 s to 92 s.
 - **MPPI is the slowest** (79 s mean) and stalled in 2 of 8 trials. **Graceful** is reliable only with some planners (6 of 8) and drives the longest path (37.1 m). **DWB (`FollowPath`)** is fast when it works (50 s) but stalled in 4 of 8 trials.
 - **SmacHybrid was the most reliable planner** (8 of 8) but the slowest (67.9 s mean), probably because its kinematically feasible paths are longer and slower to follow. This was not measured separately.
-- **Stalls:** in the six stalled trials I checked, the controller logged 3 to 4 `Failed to make progress` aborts before the explorer's 40 s stall stop. I did not find the root cause. These are likely related to the "stall near an obstacle" issue in `PROJECT_STATUS.md`.
+- **Stalls:** in the six stalled trials I checked, the controller logged 3 to 4 `Failed to make progress` aborts before the explorer's 40 s stall stop. I did not find the root cause. They are very likely the wall lock-up described in `SYSTEM_REVIEW.md`.
 
 ## 3. Limits of this comparison
 

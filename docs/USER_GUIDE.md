@@ -1,4 +1,4 @@
-# Testing Guide: Unity 6 + ROS 2 Jazzy 2D SLAM/Nav2 (TurtleBot3)
+# User guide: Unity 6 + ROS 2 Jazzy 2D SLAM/Nav2 (TurtleBot3)
 
 Work through the stages in order. Each stage has a **Pass** check; do not continue until it passes.
 Paths assume `~/robotic/terrain_nav_project`.
@@ -204,20 +204,11 @@ A summary of every run (outcome, time, path, speed) is written to `exploration.r
 | Planner "failed to create plan" | Goal in unknown or inflated space; pick a goal in mapped free space |
 | `malformed launch argument '[planner:='` | Square brackets in a usage line were typed literally; omit them |
 
-## Problems found while running this guide (2026-10-08) and their fixes
+## Operational traps
 
-| Symptom | Cause | Fix (already applied) |
-| :--- | :--- | :--- |
-| Compile errors `Clock` namespace | `TerrainNavigation.Clock` namespace shadowed the `Clock` class | namespace renamed `TerrainNavigation.ClockSync` |
-| TurtleBot pink | no URP pipeline asset assigned | copied `Assets/Settings/UniversalRenderPipelineAsset*.asset`, assigned in Graphics + all Quality levels |
-| Robot ignores `/cmd_vel`, wheels do not turn | URDF wheel inertia (~1e-5) is too small for Unity 6 to follow the drive | `AGVController.wheelInertia = 1e-3` applied in the first FixedUpdate |
-| Robot 4.5x too fast | prefab instance in the scene scaled 5x | scale must be (1,1,1); `AGVController` now warns otherwise |
-| Turn rate wrong | wheel speed difference used the full track width | uses half of it |
-| `/clock`, `/scan` and TF only ~1 Hz | Unity throttled (Ultra quality, v-sync, window unfocused under Wayland) | `runInBackground`, v-sync off, Low default quality, 60 fps cap |
-| Two `map->odom` publishers | prefab TF frames were `{map, odom}` | now `{odom}` only; `slam_toolbox` owns `map->odom` |
-| Nav2 stays `unconfigured` | (1) MPPI `model_dt` 0.05 != controller period 0.1 (2) `collision_monitor`, `route_server`, `docking_server` had no params (3) Galactic `plugin_lib_names` list crashed `bt_navigator` ("ID already registered") (4) `default_nav_to_pose_bt_xml: ""` means an empty tree | fixed in `nav2_params_2d.yaml` and `nav2_params_3d.yaml` |
-
-Operational traps: stale `lifecycle_manager` / launch processes from an earlier run keep fighting a new launch (check `ps -eo pid,args | grep -E "lifecycle_manager|ros2 launch"` before relaunching); and `pkill -f` patterns can match your own shell command.
+- Stale `lifecycle_manager` / launch processes from an earlier run fight a new launch. Check `ps -eo pid,args | grep -E "lifecycle_manager|ros2 launch"` before relaunching.
+- `pkill -f` patterns can match your own shell command.
+- Do not save C# scripts while Unity is in Play mode; the ROS publishers do not re-register after a recompile.
 
 ## Verified results (2D SLAM + Nav2, Unity editor, TurtleBot3)
 
@@ -233,4 +224,4 @@ All 11 managed nodes reached `active`. A 1 m goal succeeded with the default pai
 | GridBased | RPP | OK | 22.4 s | slow; "Failed to make progress" logged during testing |
 | GridBased | Graceful | OK | 4.3 s | |
 
-Caveat: these runs started from different poses, so times and path lengths are indicative only. Controller switching clearly changed behaviour; planner switching is supported by differing plan shapes and re-plan counts but was not isolated with an identical start pose. Use the logger idea in the plan (Section 0.3) for a fair comparison.
+Caveat: these runs started from different poses, so times and path lengths are indicative only. Controller switching clearly changed behaviour; planner switching is supported by differing plan shapes and re-plan counts but was not isolated with an identical start pose. For a fair comparison use the benchmark (`tools/benchmark.py`, see `RESULTS.md`).

@@ -18,15 +18,12 @@ setup(
         # Maze layouts for the headless simulator
         (os.path.join('share', package_name, 'maps'),
             glob(os.path.join('maps', '*.txt'))),
-        # Behavior tree XMLs
-        (os.path.join('share', package_name, 'behavior_trees'),
-            glob(os.path.join('behavior_trees', '*.xml'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='ken',
     maintainer_email='thanhquan.kent@gmail.com',
-    description='Nav2 configuration package for terrain-aware navigation',
+    description='Nav2 configuration, frontier exploration and headless simulator for the maze test',
     license='Apache-2.0',
     extras_require={
         'test': [
