@@ -28,6 +28,35 @@ speed:
   angular_accel: 3.2      # rad/s^2
   collision_lookahead: 0.31  # m the collision monitor looks ahead (1.2 s x 0.26 m/s, the stock value);
                           # converted to time_before_collision = max(0.4 s, lookahead / max_linear)
+  reverse_zone: true      # with rotation_zone: a rear-only collision zone while backing up, so a wall touching the front or side
+                          # does not block the backup recovery (set false to compare)
+  rotation_zone: 0        # m radius of a rotation-only collision zone (0 = stock FootprintApproach). >0 swaps in Nav2
+                          # velocity_polygon so turning in place is never blocked by a wall (try 0.2)
+
+# Costmap shape (opt-in; empty = nav2_params_maze.yaml: circle robot_radius 0.22, inflation 0.55 / scale 3.0).
+# Built from the Unity TurtleBot3 waffle_pi URDF: wheels at y = +-0.144 m (0.018 m thick, outer face +-0.153 m) set the
+# width, base box x -0.197 .. +0.069 m, plus 0.02 m padding. Turning in place sweeps a ~0.28 m circle (rear corners),
+# so the rectangle leaves less margin than the circle: pair it with speed.rotation_zone.
+costmap:
+  footprint: []           # [] = circle; 'waffle' = rectangle below; or a list of [x, y] points (needs a config file,
+                          # a list cannot go through set:=). waffle = [[0.089, 0.173], [0.089, -0.173], [-0.217, -0.173], [-0.217, 0.173]]
+  robot_radius: 0         # m: plain circle for both costmaps and the monitor, overrides footprint. 0.17 = wheel outer face 0.153 m + 0.017
+  drive_zone: 0.15        # m: collision monitor approach disc used with robot_radius (0 = same as robot_radius)
+  planning_radius: 0      # m, global costmap circle used while a footprint is set (0 = preset default, waffle 0.17)
+  inflation_radius: 0     # m (0 = keep 0.55)
+  cost_scaling_factor: 0  # (0 = keep 3.0)
+
+# Extra Regulated Pure Pursuit parameters, written to the RPP controller as given (empty = nav2_params_maze.yaml).
+# e.g. rpp.use_rotate_to_heading=false (drive arcs instead of spinning in place, which jams the rear corners in a 0.5 m gap)
+# or rpp.rotate_to_heading_angular_vel=0.5. Only used when algorithms.controller is RPP.
+rpp:
+  use_rotate_to_heading: true
+
+# Per-planner parameters, written to planner_server as given (empty = nav2_params_maze.yaml). Smac2D cost_travel_multiplier
+# (default 2.0) raises the price of travelling through costly cells, so paths keep further from walls:
+#   planner.Smac2D.cost_travel_multiplier=4   (needs a larger costmap.inflation_radius to have a gradient to follow)
+planner:
+  Smac2D: {}
 
 # Goal tolerances written into the Nav2 goal checker. The final heading is irrelevant for this
 # test, so yaw is wide open: otherwise a goal a few cm away makes the robot rotate in place,
@@ -35,7 +64,21 @@ speed:
 tolerance:
   xy: 0.25                # m
   yaw: 6.3                # rad (>= pi disables the heading requirement)
-  progress_radius: 0.15   # m of movement within 10 s that counts as progress
+  progress_radius: 0.15   # m of movement within progress_time that counts as progress
+  progress_time: 2.0      # s without that movement before Nav2 reports failure and starts its recoveries (backup, spin). Nav2 default is 10;
+                          # a shorter time frees a robot stuck at a wall sooner (4 s tried 2026-10-19, 2 s kept)
+
+# Adaptive speed governor (research prototype, see docs/GOVERNOR.md). Off = stock Nav2 chain:
+#   controller -> smoother -> collision_monitor -> /cmd_vel
+# On: smoother -> speed_governor -> collision_monitor (collision monitor input moves to /cmd_vel_governed).
+# v_max / accel / omega_max / max_reverse always come from speed.* above; every other key here is
+# passed to the node as a ROS parameter (see terrain_speed_governor/config/governor.yaml).
+governor:
+  enabled: false
+  a_lat_max: 0.6          # m/s^2 lateral acceleration budget for curve speed
+  clearance_full: 0.30    # m clearance at which clearance no longer limits speed
+  reaction_time: 0.30     # s   measured: <=0.22 s in headless sim (tools/measure_braking.py) + governor tick
+  braking_decel: 1.5      # m/s^2 75 % of the ~2.0 measured in headless sim (Unity not measured)
 
 exploration:              # goal_explorer node
   mode: frontier          # frontier (explore toward goal) | direct (checkpoint-2 behaviour: send the goal at once)
@@ -49,13 +92,36 @@ exploration:              # goal_explorer node
   goal_tolerance: 0.25    # m
   stall_timeout: 40.0     # s (sim time) without moving before the test stops; 0 disables
   stall_distance: 0.15    # m that counts as moving
+  chain_distance: 0.0     # m: within this distance of a frontier target the explorer sends the next frontier at once, so the robot
+                          # does not stop at every frontier; 0 = off (old behaviour)
+  recover_timeout: 0.0    # s (sim time) without moving / without progress after which the explorer drops its target and picks
+                          # another; 0 = off. Tried at 8 s in Unity (2026-10-19): did not clear the stalls, left off
   start_delay: 20.0       # s after launch before exploration starts (Nav2 start-up)
   result_file: ""         # JSON summary (outcome, sim time, path length, speed) is written here when set
 
 headless:                 # only used when simulator: headless
+  layout: ""             # maze text file (see tools/gen_maze.py); empty = built-in maze_seed42.txt
   realtime_factor: 1.0    # >1 runs faster than real time if the CPU keeps up
   robot_radius: 0.2       # m collision circle
   max_linear: 1.0         # m/s  (mirrors the Unity prefab cap)
   max_angular: 2.0        # rad/s
   linear_accel: 2.0       # m/s^2
   angular_accel: 6.0      # rad/s^2
+
+# Named override sets, used with  profile:=NAME  (set:= still wins over a profile).
+profiles:
+  # Reached the goal in 5 of 5 Unity runs (45.5 s median 47 s, range 34.6-61.0 s, 2026-10-19, maze seed 42,
+  # Smac2D + RPP, 0.8 m/s). The RPP look-ahead of 0.35 m (default 0.6 m) is what let the robot through the ~0.5 m gap:
+  # with 0.6 m the same setup was stuck at the gap for 90 s. See docs/SESSION_2026-10-19.md.
+  reliable:
+    speed.max_linear: 0.8
+    speed.rotation_zone: 0.14
+    costmap.robot_radius: 0.17
+    costmap.inflation_radius: 0.5
+    rpp.use_rotate_to_heading: false
+    rpp.use_cost_regulated_linear_velocity_scaling: true
+    rpp.inflation_cost_scaling_factor: 3.0
+    rpp.lookahead_dist: 0.35
+    rpp.min_lookahead_dist: 0.25
+    exploration.chain_distance: 1.0
+    exploration.goal_weight: 2.0

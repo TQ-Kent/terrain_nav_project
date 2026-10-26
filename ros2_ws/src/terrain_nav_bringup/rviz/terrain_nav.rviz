@@ -171,6 +171,44 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /global_costmap/published_footprint
       Value: true
+    # Local costmap footprint: what the controller and the collision monitor check
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 255; 170; 0
+      Enabled: true
+      Name: LocalFootprint
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/published_footprint
+      Value: true
+    # Collision monitor zone (stock FootprintApproach, or VelApproach when speed.rotation_zone is set)
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 255; 0; 0
+      Enabled: true
+      Name: MonitorZoneStock
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /FootprintApproach
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 255; 0; 255
+      Enabled: true
+      Name: MonitorZoneVel
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /VelApproach
+      Value: true
     # SLAM map (2D baseline only)
     - Alpha: 0.699999988079071
       Class: rviz_default_plugins/Map

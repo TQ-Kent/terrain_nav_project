@@ -1,0 +1,41 @@
+run,setup,start,outcome,sim_time_s,path_m,avg_speed_mps,frontier_goals,chained,collision_ahead
+fp2,"rect footprint waffle 0.173 + infl 0.5 + rotzone 0.2, 0.5 m/s","-0.00, -0.00",reached,53.01,20.58,0.388,13,,11
+cma,"rect footprint waffle 0.173 + infl 0.5 + rotzone 0.2, 0.5 m/s","-0.00, -0.00",reached,45.73,21.24,0.464,11,,0
+cmc,"rect footprint waffle 0.173 + infl 0.5 + rotzone 0.2, 0.5 m/s","-0.00, -0.00",stalled,65.5,7.46,0.114,7,,107
+rd1,"circle r 0.17 + infl 0.5 + rotzone 0.14, 0.5 m/s","-0.00, -0.00",reached,45.52,20.08,0.441,13,,3
+rd2,"circle r 0.17 + infl 0.5 + rotzone 0.14, 0.5 m/s","-0.00, -0.00",reached,48.25,20.16,0.418,14,,1
+rd3,"circle r 0.17 + infl 0.5 + rotzone 0.14, 0.5 m/s","-0.00, -0.00",reached,46.25,20.35,0.44,14,,0
+sp81,"same, 0.8 m/s","-0.00, -0.00",reached,34.92,21.17,0.606,11,,0
+sp82,"same, 0.8 m/s","-0.00, -0.00",stalled,50.52,6.63,0.131,5,,0
+sp83,"same, 0.8 m/s","-0.00, -0.00",reached,62.52,22.97,0.367,14,,42
+sp101,"same, 1.0 m/s (drive zone 0.17)","-0.00, -0.00",stalled,61.25,9.04,0.148,10,,0
+z1,"same, 1.0 m/s (drive zone 0.15)","-0.00, -0.00",stalled,57.3,7.13,0.124,8,,14
+z2,"same, 1.0 m/s (drive zone 0.15)","-0.00, -0.00",stalled,102.99,7.73,0.075,12,,133
+r1,1.0 m/s + rotate-to-heading off,"-0.00, -0.00",reached,37.24,22.27,0.598,12,,0
+t1,... + 35 s cap,"-0.00, -0.00",timeout,35.24,8.84,0.251,6,,65
+t2,... + RPP look-ahead time 0.4 s,"-0.00, -0.00",timeout,35.26,7.56,0.214,15,,54
+c1,... + chain_distance 1.0,"-0.00, -0.00",timeout,35.25,8.94,0.254,8,2,76
+k1,... + cost-regulated RPP,"-0.00, -0.00",timeout,35.23,11.33,0.322,7,2,47
+k2,... + cost-regulated RPP,"-0.00, -0.00",timeout,35.23,24.99,0.709,16,9,0
+g1,... + goal_weight 2.0,"-0.00, -0.00",timeout,35.25,18.64,0.529,16,7,0
+g2,... + goal_weight 2.0,"-0.00, -0.00",reached,34.72,23.8,0.686,19,12,0
+g3,... + goal_weight 2.0,"-0.00, -0.00",timeout,35.04,20.64,0.589,15,8,0
+g4,... + goal_weight 2.0,"-0.00, -0.00",timeout,35.03,9.28,0.265,7,4,0
+v1,... + reverse zone,"-0.00, -0.00",reached,34.0,24.27,0.714,20,9,0
+v2,... + reverse zone,"-0.00, -0.00",timeout,35.26,8.81,0.25,8,4,70
+v3,... + reverse zone,"-0.00, -0.00",reached,31.75,22.05,0.694,16,9,0
+v4,... + reverse zone,"-0.00, -0.00",timeout,35.26,9.69,0.275,11,4,0
+p1,... + progress_time 4 s,"-0.00, -0.00",timeout,35.24,21.28,0.604,17,11,0
+p2,... + progress_time 4 s,"-0.00, -0.00",reached,27.15,20.45,0.753,14,6,0
+p3,... + progress_time 4 s,"-0.00, -0.00",timeout,35.26,8.46,0.24,11,4,70
+p4,... + progress_time 4 s,"-0.00, -0.00",timeout,35.24,18.9,0.536,16,9,0
+w1,... + inflation 0.8 + Smac2D cost_travel_multiplier 4 (progress_time 2 s),"-0.00, -0.00",timeout,35.22,14.0,0.397,11,4,37
+w2,... + inflation 0.8 + Smac2D cost_travel_multiplier 4 (progress_time 2 s),"-0.00, -0.00",timeout,35.0,9.68,0.277,20,6,60
+w3,... + inflation 0.8 + Smac2D cost_travel_multiplier 4 (progress_time 2 s),"-0.00, -0.00",timeout,35.24,22.77,0.646,18,13,0
+w4,... + inflation 0.8 + Smac2D cost_travel_multiplier 4 (progress_time 2 s),"-0.00, -0.00",timeout,35.02,17.92,0.512,17,9,0
+a1,"profile reliable but RPP lookahead_dist 0.6 (default), 0.8 m/s, 90 s cap","-0.00, -0.00",timeout,90.23,21.13,0.234,19,9,172
+b1,"profile reliable (RPP lookahead_dist 0.35, min 0.25), 0.8 m/s, 90 s cap","-0.00, -0.00",reached,34.63,19.95,0.576,14,7,0
+b2,"profile reliable (RPP lookahead_dist 0.35, min 0.25), 0.8 m/s, 90 s cap","-0.00, -0.00",reached,46.98,22.44,0.478,13,2,1
+b3,"profile reliable (RPP lookahead_dist 0.35, min 0.25), 0.8 m/s, 90 s cap","-0.00, -0.00",reached,48.0,21.54,0.449,14,3,10
+b4,"profile reliable (RPP lookahead_dist 0.35, min 0.25), 0.8 m/s, 90 s cap","-0.00, -0.00",reached,60.97,23.39,0.384,14,4,25
+b5,"profile reliable (RPP lookahead_dist 0.35, min 0.25), 0.8 m/s, 90 s cap","-0.00, -0.00",reached,45.5,21.65,0.476,14,6,3

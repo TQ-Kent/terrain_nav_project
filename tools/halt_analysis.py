@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Find out where a maze run loses time: record it, then classify every halt.
 
-    # terminal 1 (headless simulator; Unity must not be in Play mode)
+    # terminal 1 (headless simulator, or Unity in Play: the pose comes from /sim/ground_truth or the map->base_link TF)
     ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py set:=rviz=false,exploration.result_file=/tmp/run.json
     # terminal 2, started before the launch ends
     python3 tools/halt_analysis.py record /tmp/run_trace
@@ -31,6 +31,12 @@ def record(prefix):
     from rclpy.qos import QoSProfile, ReliabilityPolicy
     from geometry_msgs.msg import PoseStamped, Twist
     from nav_msgs.msg import Path
+    from tf2_ros import Buffer, TransformListener
+    from nav2_msgs.msg import CollisionMonitorState
+    from sensor_msgs.msg import LaserScan
+    from nav_msgs.msg import OccupancyGrid
+    from rclpy.qos import DurabilityPolicy
+    import numpy as np
     from action_msgs.msg import GoalStatusArray
     from rosgraph_msgs.msg import Clock
 
@@ -41,25 +47,76 @@ def record(prefix):
             self.pose = None
             self.cmd = {'nav': 0.0, 'smooth': 0.0, 'final': 0.0}
             self.az = 0.0
+            self.azs = {'smooth': 0.0, 'final': 0.0}
+            self.yaw = 0.0
+            self.scan = (float('nan'), float('nan'))   # nearest scan point to base_footprint: distance m, bearing rad
+            self.cm = (0, '')   # collision monitor: action (0 none, 1 stop, 2 slowdown, 3 approach, 4 limit), polygon
             self.status = {}
             self.samples = open(f'{prefix}_samples.csv', 'w', newline='')
             self.events = open(f'{prefix}_events.csv', 'w', newline='')
             self.sw, self.ew = csv.writer(self.samples), csv.writer(self.events)
-            self.sw.writerow(['t', 'x', 'y', 'cmd_nav', 'cmd_smooth', 'cmd_final', 'az_nav'])
+            self.sw.writerow(['t', 'x', 'y', 'cmd_nav', 'cmd_smooth', 'cmd_final', 'az_nav', 'az_smooth', 'az_final', 'yaw', 'cm_action', 'cm_polygon', 'scan_d', 'scan_bearing'])
             self.ew.writerow(['t', 'event', 'detail'])
             be = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
             self.create_subscription(Clock, '/clock', self.on_clock, be)
-            self.create_subscription(PoseStamped, '/sim/ground_truth', self.on_pose, 10)
+            self.create_subscription(PoseStamped, '/sim/ground_truth', self.on_pose, 10)   # headless
             for k, topic in (('nav', '/cmd_vel_nav'), ('smooth', '/cmd_vel_smoothed'), ('final', '/cmd_vel')):
                 self.create_subscription(Twist, topic, lambda m, k=k: self.on_cmd(k, m), 10)
             self.create_subscription(GoalStatusArray, '/navigate_to_pose/_action/status', self.on_status, 10)
-            self.create_subscription(Path, '/plan', lambda m: self.event('PLAN', len(m.poses)), 10)
+            self.create_subscription(Path, '/plan', self.on_plan, 10)
+            self.tf = Buffer()
+            self.tf_listener = TransformListener(self.tf, self)   # Unity: no pose topic, only TF
+            self.create_subscription(LaserScan, '/scan', self.on_scan, be)
+            self.create_subscription(CollisionMonitorState, '/collision_monitor_state', self.on_cm, 10)
+            # dump the local costmap and the path the controller follows when it goes silent (see sample)
+            self.lcm = None
+            self.cpath = None
+            self.silent_since = None
+            self.dumps = 0
+            self.create_subscription(OccupancyGrid, '/local_costmap/costmap', lambda m: setattr(self, 'lcm', m), 1)
+            self.create_subscription(Path, '/received_global_plan', lambda m: setattr(self, 'cpath', m), 1)
             self.create_timer(0.05, self.sample)
+
+        def on_scan(self, m):
+            # nearest scan point to the base_footprint origin (the collision monitor measures from there), not to the lidar
+            try:
+                tf = self.tf.lookup_transform('base_footprint', m.header.frame_id, rclpy.time.Time()).transform
+            except Exception:
+                return
+            q = tf.rotation
+            yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+            r = np.asarray(m.ranges, dtype=float)
+            a = m.angle_min + np.arange(len(r)) * m.angle_increment + yaw
+            ok = np.isfinite(r) & (r >= m.range_min) & (r <= m.range_max)
+            if not ok.any():
+                return
+            x = tf.translation.x + r[ok] * np.cos(a[ok])
+            y = tf.translation.y + r[ok] * np.sin(a[ok])
+            d = np.hypot(x, y)
+            i = int(np.argmin(d))
+            self.scan = (float(d[i]), float(math.atan2(y[i], x[i])))
+
+        def on_cm(self, m):
+            cm = (int(m.action_type), m.polygon_name)
+            if cm != self.cm:
+                self.event('CM', f'action={cm[0]} polygon={cm[1] or "-"}')
+            self.cm = cm
+
+        def on_plan(self, m):
+            # detail = pose count; bearing (rad) from the plan start to its 10th pose, to compare with the yaw
+            n = len(m.poses)
+            b = ''
+            if n > 1:
+                a, c = m.poses[0].pose.position, m.poses[min(9, n - 1)].pose.position
+                b = f' bearing={math.atan2(c.y - a.y, c.x - a.x):.2f}'
+            self.event('PLAN', f'{n}{b}')
 
         def on_cmd(self, k, m):
             self.cmd[k] = m.linear.x
             if k == 'nav':
                 self.az = m.angular.z
+            else:
+                self.azs[k] = m.angular.z
 
         def on_clock(self, m):
             self.t = m.clock.sec + m.clock.nanosec * 1e-9
@@ -79,10 +136,34 @@ def record(prefix):
                     self.event(STATUS.get(s.status, s.status), uid)
 
         def sample(self):
-            if self.t is None or self.pose is None:
+            if self.t is None:
                 return
+            try:
+                tf = self.tf.lookup_transform('map', 'base_link', rclpy.time.Time()).transform
+                tr, q = tf.translation, tf.rotation
+                self.pose = (tr.x, tr.y)
+                self.yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+            except Exception:
+                pass
+            if self.pose is None:
+                return
+            if self.t > 15 and abs(self.cmd['nav']) < 0.02 and abs(self.az) < 0.02:
+                self.silent_since = self.silent_since if self.silent_since is not None else self.t
+                if self.t - self.silent_since > 1.5 and self.dumps < 3 and self.lcm is not None and self.cpath is not None:
+                    self.dumps += 1
+                    g = self.lcm
+                    np.savez(f'{prefix}_silent{self.dumps}.npz', t=self.t, robot=self.pose, yaw=self.yaw,
+                             grid=np.array(g.data, dtype=np.int16).reshape(g.info.height, g.info.width),
+                             res=g.info.resolution, origin=(g.info.origin.position.x, g.info.origin.position.y),
+                             frame=g.header.frame_id,
+                             path=np.array([(q.pose.position.x, q.pose.position.y) for q in self.cpath.poses]).reshape(-1, 2))
+                    self.event('DUMP', f'silent{self.dumps}')
+            else:
+                self.silent_since = None
             self.sw.writerow([f'{self.t:.3f}', f'{self.pose[0]:.4f}', f'{self.pose[1]:.4f}',
-                              f'{self.cmd["nav"]:.3f}', f'{self.cmd["smooth"]:.3f}', f'{self.cmd["final"]:.3f}', f'{self.az:.3f}'])
+                              f'{self.cmd["nav"]:.3f}', f'{self.cmd["smooth"]:.3f}', f'{self.cmd["final"]:.3f}', f'{self.az:.3f}',
+                              f'{self.azs["smooth"]:.3f}', f'{self.azs["final"]:.3f}', f'{self.yaw:.3f}',
+                              self.cm[0], self.cm[1], f'{self.scan[0]:.3f}', f'{self.scan[1]:.2f}'])
 
     rclpy.init()
     node = Rec()
@@ -101,7 +182,7 @@ def record(prefix):
 
 
 def load(prefix):
-    s = [[float(v) for v in r] for r in list(csv.reader(open(f'{prefix}_samples.csv')))[1:]]
+    s = [[float(v) for v in r[:10]] + r[10:] for r in list(csv.reader(open(f'{prefix}_samples.csv')))[1:]]
     e = [(float(r[0]), r[1], r[2]) for r in list(csv.reader(open(f'{prefix}_events.csv')))[1:]]
     return s, e
 
@@ -237,6 +318,16 @@ def analyze(prefix):
     lock_tail = sum(b[0] - a[0] for a, b in zip(tail, tail[1:]) if a[3] > 0.3 and a[5] < 0.02)
     print(f'controller commanded >0.3 m/s but final /cmd_vel was 0: {lock:.1f} s in the whole recording, '
           f'{lock_tail:.1f} s of its last 35 s' + ('   <-- locked against a wall' if lock_tail > 10 else ''))
+    # which collision monitor zone held the command (needs the cm_action / cm_polygon columns, newer recordings)
+    names = {'0': 'none', '1': 'STOP', '2': 'SLOWDOWN', '3': 'APPROACH', '4': 'LIMIT'}
+    held = {}
+    for a, b in zip(full, full[1:]):
+        if a[3] > 0.3 and a[5] < 0.02 and len(a) > 11:
+            k = f'{names.get(str(a[10]), a[10])} {a[11] or "-"}'
+            held[k] = held.get(k, 0.0) + b[0] - a[0]
+    if held:
+        print('collision monitor state while the command was held at 0: ' +
+              ', '.join(f'{k} {v:.1f} s' for k, v in sorted(held.items(), key=lambda kv: -kv[1])))
     # latency from a goal being accepted to the robot moving
     lat = []
     for a, b, res, u in intervals:

@@ -146,9 +146,10 @@ Speed is not a launch argument. It lives in one file and the launch writes it in
 
 **One-off change (nothing is edited):** pass `set:=` on the launch line. Several values are comma-separated with no spaces:
 ```bash
-ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py \
+ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py profile:=reliable \
   set:=speed.max_linear=0.8,speed.max_angular=2.0,speed.linear_accel=1.5
 ```
+Use `profile:=reliable` (0.17 m circular footprint, RPP look-ahead 0.35 m, and more; see `docs/SESSION_2026-10-19.md` section 5). Without it the default 0.22 m footprint closes the ~0.52 m gap near (2.0, -2.8) and the robot reroutes or fails to plan. `set:=` still overrides the profile.
 
 | Key | Unit | Meaning |
 | :-- | :-- | :-- |
@@ -158,6 +159,14 @@ ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py \
 | `speed.linear_accel` | m/s^2 | forward acceleration, also used for braking |
 | `speed.angular_accel` | rad/s^2 | turn acceleration |
 | `speed.collision_lookahead` | m | how far ahead the collision monitor looks (converted to a time from the speed) |
+
+**Recommended run (Unity, tested 2026-10-26):**
+```bash
+cd ros2_ws && source /opt/ros/jazzy/setup.bash && source install/setup.bash
+ros2 launch terrain_nav_bringup bringup_maze_2d.launch.py planner:=Smac2D controller:=RPP \
+  profile:=reliable localization:=ground_truth set:=speed.max_linear=0.8,exploration.max_time=90
+```
+Stop Play and press it again before every run; check that the first `Begin navigating` pose is `(0, 0)`, otherwise the run is invalid. Seven valid runs on maze seed 42 (0.8, 0.9 and 1.0 m/s, 2-3 each) all reached the goal: typically 31-36 s, but two runs took 70-74 s after stalls (`Failed to make progress`, `collision ahead`). Speed between 0.8 and 1.0 m/s made no clear difference, so 0.8 is used. One maze and a few runs: an indication, not a guarantee.
 
 **Unity caps the speed:** `AGVController` on the robot prefab has `maxLinearSpeed` 1.0 m/s and `maxRotationalSpeed` 2.0 rad/s. Asking Nav2 for more has no effect. To go faster, raise those two values on the prefab (and then `speed.*`), and re-test: nothing above 1.0 m/s has been tried.
 
@@ -192,6 +201,14 @@ If the launch ends before the robot reaches the goal, read the last lines of the
 
 A summary of every run (outcome, time, path, speed) is written to `exploration.result_file` when it is set, for example `set:=exploration.result_file=/tmp/run.json`.
 
+## Speed governor (optional)
+
+Off by default. Enable with `set:=governor.enabled=true`; the node then runs between the velocity
+smoother and the collision monitor and publishes `/speed_governor/status` (JSON). Build, tests,
+parameters and the benchmark (`tools/benchmark.py --only governor`) are in `docs/GOVERNOR.md`.
+Do not run two benchmark/simulator sessions on the same `ROS_DOMAIN_ID`: a second simulator
+publishing `/clock` and `/scan` corrupts both runs (use `ROS_DOMAIN_ID=<n>` to separate them).
+
 ## Quick troubleshooting
 
 | Symptom | Likely cause |
@@ -225,3 +242,25 @@ All 11 managed nodes reached `active`. A 1 m goal succeeded with the default pai
 | GridBased | Graceful | OK | 4.3 s | |
 
 Caveat: these runs started from different poses, so times and path lengths are indicative only. Controller switching clearly changed behaviour; planner switching is supported by differing plan shapes and re-plan counts but was not isolated with an identical start pose. For a fair comparison use the benchmark (`tools/benchmark.py`, see `RESULTS.md`).
+
+## More maze maps with obstacles (Unity and headless)
+
+`tools/gen_maze.py` can add grid-aligned obstacle blocks on top of the seeded maze walls; every
+corridor stays at least 1.0 m wide and start to goal stays reachable (checked by a 2x2-window BFS).
+
+    python3 tools/gen_maze.py --seed 205 --profile mixed --obstacles 8 --out tools/mazes/maze_mixed_s205.txt
+
+Profiles: `none`, `pillars` (single corner blocks), `baffles` (1x2 blocks along a cell edge),
+`narrow` (doorways reduced to a 1.0 m gap), `mixed`. Ready-made layouts are in `tools/mazes/`
+(seeds 201-206). Headless: `set:=headless.layout=tools/mazes/maze_mixed_s205.txt`.
+
+Unity builds the identical maze from the same file (menu **TerrainNav → Build Maze Scene From
+Layout...**, or in batch mode):
+
+    ~/Unity/Hub/Editor/6000.0.84f1/Editor/Unity -batchmode -nographics -quit -projectPath unity_project \
+      -executeMethod TerrainNavigation.EditorTools.BuildMazeScene.BuildFromCommandLine \
+      -layout $PWD/tools/mazes/maze_mixed_s205.txt
+
+This writes `Assets/Scenes/Maze_<name>.unity` and leaves Build Settings unchanged (the original
+`MazeScene.unity` builder is unchanged). The scenes were built in batch mode; they have not yet
+been driven with the ROS stack in Unity.

@@ -291,6 +291,8 @@ Here `k_phi: 2.0`, `k_delta: 1.0`, `beta: 0.4`, `lambda: 2.0`. With v_max = 1.0 
 - Neither layer guarantees clearance from walls on its own. Clearance comes from the costmap inflation (section 1), from how much each algorithm weights cell cost (`cost_travel_multiplier`, `cost_penalty`, the DWB and MPPI obstacle critics), and finally from the collision monitor, which only stops the robot, it does not steer it away.
 - Both run on a map that lags the real world by up to about 2 s here (SLAM map at 1 Hz, global costmap at 1 Hz), which matters more as speed rises.
 
+An optional speed governor (curvature, clearance, braking distance, perception freshness) can sit between the velocity smoother and the collision monitor: see `GOVERNOR.md`. With it enabled the command chain is controller ► `/cmd_vel_nav` ► smoother ► `/cmd_vel_smoothed` ► governor ► `/cmd_vel_governed` ► collision monitor ► `/cmd_vel`.
+
 See `RESULTS.md` for the measured results and `SYSTEM_REVIEW.md` for where time is lost.
 
 ## 5. References (for the equations)

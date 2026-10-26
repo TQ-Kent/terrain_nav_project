@@ -118,3 +118,7 @@ A local controller turns the global path and the nearby (local) costmap into vel
 - **Avoid MPPI and `GridBased+FollowPath` in this maze until the stalls are understood.**
 - **Before relying on this ranking:** repeat the top three pairs (`Smac2D+RPP`, `GridBased+RPP`, `SmacHybrid+FollowPath`) in Unity several times, and add trials at 0.5 m/s and on a second maze or goal.
 - **Open issue:** the `Failed to make progress` aborts in stalled trials have no confirmed cause.
+
+## 7. Speed governor results
+
+The governor (off by default) is evaluated separately in [`GOVERNOR.md`](GOVERNOR.md#results-headless-ground_truth-smac2d-preliminary). Headless only, small samples, no supported claim that it is faster or safer; the start-cell wall lock occurs with and without it.
