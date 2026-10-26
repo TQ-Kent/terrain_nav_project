@@ -405,7 +405,7 @@ collision_monitor:
       time_before_collision: 1.2
       simulation_time_step: 0.1
       min_points: 6
-      visualize: false
+      visualize: true       # display only: RViz shows the zone on /FootprintApproach
       enabled: true
     observation_sources:
     - scan

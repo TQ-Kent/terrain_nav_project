@@ -1,0 +1,23 @@
+[
+ {
+  "cmd_v": 0.3,
+  "measured_v": 0.3,
+  "delay_s": 0.21,
+  "decel_mps2": 1.14,
+  "stop_dist_m": 0.061
+ },
+ {
+  "cmd_v": 0.5,
+  "measured_v": 0.5,
+  "delay_s": 0.22,
+  "decel_mps2": 1.9,
+  "stop_dist_m": 0.124
+ },
+ {
+  "cmd_v": 0.8,
+  "measured_v": 0.8,
+  "delay_s": 0.22,
+  "decel_mps2": 2.06,
+  "stop_dist_m": 0.219
+ }
+]

@@ -42,12 +42,18 @@ class GoalExplorer(Node):
         self.declare_parameter('result_file', '')       # JSON summary written when the test ends
         self.declare_parameter('stall_timeout', 40.0)    # s (sim time) without moving; 0 disables
         self.declare_parameter('stall_distance', 0.15)   # m that counts as moving
+        self.declare_parameter('chain_distance', 0.0)    # m: this close to a frontier target, send the next frontier at once instead of stopping at it; 0 = off
+        self.declare_parameter('recover_timeout', 0.0)   # s (sim time) without moving, or without getting closer to the frontier target, after which the target is dropped; 0 disables
         self.last_view = None
         self.t_start = None                              # sim time of the first goal sent
         self.path_length = 0.0
         self.last_sample = None
         self.n_frontier_goals = 0
         self.n_failed = 0
+        self.n_recoveries = 0
+        self.n_chained = 0
+        self.target_xy = None
+        self.last_recover = 0.0
         self.create_timer(0.2, self.sample_path)
         self.last_move = None                            # (x, y, time) of last significant move
         self.goal = (self.get_parameter('goal_x').value, self.get_parameter('goal_y').value)
@@ -103,6 +109,10 @@ class GoalExplorer(Node):
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = pose
         self.target, self.target_is_goal = cell, is_goal
+        self.target_xy = xy
+        self.best_dist = math.hypot(xy[0] - robot[0], xy[1] - robot[1])   # closest approach so far
+        self.best_time = self.now_s()
+        self.best_pos = robot
         self.get_logger().info(
             f'{"GOAL" if is_goal else "frontier"} -> ({xy[0]:.2f}, {xy[1]:.2f})')
         self.seq += 1
@@ -170,7 +180,7 @@ class GoalExplorer(Node):
         result = {'outcome': outcome, 'sim_time_s': round(t, 2),
                   'path_m': round(self.path_length, 2),
                   'avg_speed_mps': round(self.path_length / t, 3) if t > 0 else 0.0,
-                  'frontier_goals': self.n_frontier_goals, 'failed_targets': self.n_failed,
+                  'frontier_goals': self.n_frontier_goals, 'failed_targets': self.n_failed, 'recoveries': self.n_recoveries, 'chained': self.n_chained,
                   'goal': list(self.goal)}
         self.get_logger().info(f'RESULT {json.dumps(result)}')
         path = self.get_parameter('result_file').value
@@ -186,6 +196,24 @@ class GoalExplorer(Node):
                 robot[1] - self.last_move[1]) > self.get_parameter('stall_distance').value:
             self.last_move = (robot[0], robot[1], now)
             return False
+        rec = self.get_parameter('recover_timeout').value
+        idle = now - self.last_move[2]
+        if rec > 0 and self.t_start is not None and idle > rec and now - self.last_recover > rec:
+            self.last_recover = now
+            self.recover(robot, f'no movement for {idle:.0f} s')
+        elif rec > 0 and self.target is not None and not self.target_is_goal:
+            # Nav2's own recoveries (backup, spin) move the robot, which resets the idle timer above while
+            # the planner keeps failing for this frontier. Progress toward the target is the better test.
+            d = math.hypot(self.target_xy[0] - robot[0], self.target_xy[1] - robot[1])
+            if d < self.best_dist - 0.25:
+                self.best_dist, self.best_time, self.best_pos = d, now, robot
+            elif now - self.best_time > rec:
+                # A path that detours around a wall moves away from the target for a while, so also require
+                # that the robot stayed within 1 m of where the timer started.
+                stayed = math.hypot(robot[0] - self.best_pos[0], robot[1] - self.best_pos[1]) < 1.0
+                self.best_time, self.best_pos = now, robot
+                if stayed:
+                    self.recover(robot, f'no progress toward the frontier for {rec:.0f} s')
         timeout = self.get_parameter('stall_timeout').value
         if timeout > 0 and now - self.last_move[2] > timeout:
             self.get_logger().error(
@@ -197,6 +225,24 @@ class GoalExplorer(Node):
             rclpy.try_shutdown()
             return True
         return False
+
+    def recover(self, robot, why):
+        """Robot has not moved for recover_timeout: drop the current target and pick another.
+
+        Nav2's own recoveries (clear costmap, spin, backup) run inside one goal; when the planner keeps
+        failing the goal stays active and the robot sits until stall_timeout ends the whole test. Blacklisting
+        the frontier and replacing the goal lets the explorer try another frontier (or the escape cell
+        when nothing else is reachable) after recover_timeout instead.
+        """
+        self.n_recoveries += 1
+        self.get_logger().warn(
+            f'{why} at ({robot[0]:.2f}, {robot[1]:.2f}); dropping the target')
+        if self.target is not None and not self.target_is_goal:
+            expiry = time.time() + self.get_parameter('blacklist_seconds').value
+            self.blacklist.append((*self.target, expiry))
+        self.seq += 1                                   # ignore the old goal's result
+        self.target = None
+        self.target_is_goal = False
 
     def dump_view(self, robot):
         """Save the costmap the explorer last used, for diagnosing the stall."""
@@ -253,6 +299,24 @@ class GoalExplorer(Node):
             if not self.target_is_goal or self.target is None:
                 self.send(goal_cell, self.goal, robot, True)
             return
+        chain = self.get_parameter('chain_distance').value
+        if (chain > 0 and self.target is not None and not self.target_is_goal and self.target_xy is not None
+                and math.hypot(robot[0] - self.target_xy[0], robot[1] - self.target_xy[1]) < chain):
+            # Close to the current frontier: hand Nav2 the next one now, so the robot keeps moving instead of
+            # braking to a stop at every frontier (each stop-and-go cost 2-3 s at speed). Only when another
+            # frontier exists; the one left behind is skipped for a few seconds.
+            skip = self.blacklist + [(*self.target, now + 10.0)]
+            nxt = fl.best_frontier(
+                grid, robot_cell, goal_cell, info.resolution,
+                clearance_m=self.get_parameter('clearance').value, min_clearance_m=0.0, occ_thresh=99,
+                min_size=self.get_parameter('min_frontier_cells').value,
+                goal_weight=self.get_parameter('goal_weight').value,
+                blacklist=[(b[0], b[1]) for b in skip])[0]
+            if nxt is not None:
+                self.blacklist = skip
+                self.n_chained += 1
+                self.send(nxt, self.to_xy(nxt), robot, False)
+                return
         if best is None and self.target is None:
             # Wedged against a wall (robot cell at obstacle cost): nothing is reachable from here, so first
             # drive to the nearest clear cell. Without this the test sat at "no frontier left" until stall.

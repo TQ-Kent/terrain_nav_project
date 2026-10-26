@@ -17,7 +17,15 @@ def _setup(context):
     arg = lambda n: context.launch_configurations.get(n, '')
 
     config_path = arg('config') or os.path.join(bringup_dir, 'config', 'maze_test.yaml')
-    overrides = [o for o in arg('set').split(',') if o.strip()]
+    # profile:=NAME applies the overrides listed under `profiles.NAME` in the config file first; set:= and the
+    # single-value arguments below still win over it.
+    profile_overrides = []
+    if arg('profile'):
+        prof = (maze_config.load(config_path).get('profiles') or {}).get(arg('profile'))
+        if prof is None:
+            raise RuntimeError(f"unknown profile '{arg('profile')}' in {config_path}")
+        profile_overrides = [f'{k}={str(v).lower() if isinstance(v, bool) else v}' for k, v in prof.items()]
+    overrides = profile_overrides + [o for o in arg('set').split(',') if o.strip()]
     for name, key in (('planner', 'algorithms.planner'), ('controller', 'algorithms.controller'),
                       ('goal_x', 'goal.x'), ('goal_y', 'goal.y'), ('localization', 'localization'),
                       ('simulator', 'simulator')):
@@ -30,9 +38,13 @@ def _setup(context):
     headless = cfg['simulator'] == 'headless'
     ex, sp = cfg['exploration'], cfg['speed']
 
+    gov = cfg.get('governor') or {}
+    gov_on = bool(gov.get('enabled', False))
+
     profile = {'maze': 'nav2_params_maze.yaml', 'baseline_2d': 'nav2_params_2d.yaml'}[cfg['nav2_profile']]
     nav2_params = maze_config.nav2_params(os.path.join(nav_dir, 'config', profile), sp,
-                                         cfg.get('tolerance'))
+                                         cfg.get('tolerance'), governor_enabled=gov_on,
+                                         costmap=cfg.get('costmap'), rpp=cfg.get('rpp'), planner=cfg.get('planner'))
     slam_params = os.path.join(
         nav_dir, 'config', 'slam_toolbox_2d_gt.yaml' if ground_truth else 'slam_toolbox_2d.yaml')
 
@@ -66,6 +78,16 @@ def _setup(context):
         target_action=explorer_node, on_exit=[Shutdown(reason='goal reached or robot stalled')]))
 
     actions = [baseline, explorer, stop]
+    if gov_on:
+        gov_params = {k: v for k, v in gov.items() if k != 'enabled'}
+        gov_params.update(v_max=float(sp['max_linear']), max_reverse=float(sp['max_reverse']),
+                          omega_max=float(sp['max_angular']), accel=float(sp['linear_accel']),
+                          decel=float(sp['linear_accel']), use_sim_time=True)
+        actions.append(Node(
+            package='terrain_speed_governor', executable='speed_governor', name='speed_governor',
+            output='screen', parameters=[
+                os.path.join(get_package_share_directory('terrain_speed_governor'), 'config', 'governor.yaml'),
+                gov_params]))
     if ground_truth:
         actions.insert(0, Node(
             package='tf2_ros', executable='static_transform_publisher',
@@ -75,6 +97,7 @@ def _setup(context):
         actions.insert(0, Node(
             package='terrain_navigation', executable='headless_sim', name='headless_sim',
             output='screen', parameters=[{
+                **({'layout': str(h['layout'])} if h.get('layout') else {}),
                 'realtime_factor': float(h['realtime_factor']),
                 'robot_radius': float(h['robot_radius']),
                 'max_linear': float(h['max_linear']), 'max_angular': float(h['max_angular']),
@@ -94,6 +117,7 @@ def generate_launch_description():
     """
     helps = {
         'config': 'path to a config file (default: share/terrain_nav_bringup/config/maze_test.yaml)',
+        'profile': "named set of overrides from the config file's `profiles:` section, e.g. 'reliable'",
         'set': "comma-separated overrides, e.g. 'speed.max_linear=0.8,exploration.goal_weight=2'",
         'planner': 'override algorithms.planner', 'controller': 'override algorithms.controller',
         'goal_x': 'override goal.x', 'goal_y': 'override goal.y',
