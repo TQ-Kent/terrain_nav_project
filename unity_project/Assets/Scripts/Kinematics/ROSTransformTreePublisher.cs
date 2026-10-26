@@ -72,7 +72,7 @@ namespace TerrainNavigation.Kinematics
             {
                 var tfRootToGlobal = new TransformStampedMsg(
                     new HeaderMsg(new TimeStamp(Clock.time), m_GlobalFrameIds.Last()),
-                    m_TransformRoot.name,
+                    RobotNamespace.Frame(this, m_TransformRoot.name),
                     m_TransformRoot.Transform.To<FLU>());
                 tfMessageList.Add(tfRootToGlobal);
             }
@@ -91,7 +91,17 @@ namespace TerrainNavigation.Kinematics
                 tfMessageList.Add(tfGlobalToGlobal);
             }
 
+            var firstRobotLink = tfMessageList.Count;
             PopulateTFList(tfMessageList, m_TransformRoot);
+            // Link frames are named after the GameObjects; with a namespace each robot gets its own copy.
+            if (RobotNamespace.Of(this).Length > 0)
+            {
+                for (var i = firstRobotLink; i < tfMessageList.Count; ++i)
+                {
+                    tfMessageList[i].header.frame_id = RobotNamespace.Frame(this, tfMessageList[i].header.frame_id);
+                    tfMessageList[i].child_frame_id = RobotNamespace.Frame(this, tfMessageList[i].child_frame_id);
+                }
+            }
 
             var tfMessage = new TFMessageMsg(tfMessageList.ToArray());
             m_ROS.Publish(k_TfTopic, tfMessage);

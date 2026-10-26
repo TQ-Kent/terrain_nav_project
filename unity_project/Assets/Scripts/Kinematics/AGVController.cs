@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Geometry;
+using TerrainNavigation.Core;
 
 namespace TerrainNavigation.Kinematics
 {
@@ -56,8 +57,9 @@ namespace TerrainNavigation.Kinematics
             SetParameters(wA1);
             SetParameters(wA2);
             m_ROS = ROSConnection.GetOrCreateInstance();
-            m_ROS.Subscribe<TwistMsg>(m_TopicName, ReceiveROSCmd);
-            Debug.Log($"AGVController: Subscribed to /{m_TopicName}");
+            var topic = RobotNamespace.Topic(this, m_TopicName);
+            m_ROS.Subscribe<TwistMsg>(topic, ReceiveROSCmd);
+            Debug.Log($"AGVController: Subscribed to /{topic.TrimStart('/')}");
         }
 
         void ReceiveROSCmd(TwistMsg cmdVel)

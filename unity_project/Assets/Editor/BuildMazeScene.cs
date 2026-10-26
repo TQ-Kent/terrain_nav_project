@@ -16,6 +16,56 @@ namespace TerrainNavigation.EditorTools
         const int Seed = 42;
         const int ExtraOpenings = 4;    // knocked-out walls so the maze has loops (alternative routes)
 
+        // Robots in the next scene built (1 = the original single robot with un-namespaced topics).
+        static int s_RobotCount = 1;
+
+        // Same seed-42 maze with N namespaced robots (robot0..robotN-1), one per cell along the bottom row,
+        // 2 m apart. Topics: /robotK/scan, /robotK/cmd_vel; TF frames robotK/base_link, ...
+        [MenuItem("TerrainNav/Build Maze Scene (3 robots)")]
+        public static void CreateMazeScene3Robots() => CreateMultiRobot(3);
+
+        [MenuItem("TerrainNav/Build Maze Scene (2 robots)")]
+        public static void CreateMazeScene2Robots() => CreateMultiRobot(2);
+
+        static void CreateMultiRobot(int count)
+        {
+            s_RobotCount = count;
+            try
+            {
+                int size = Cells * CellChars + 1;
+                var wall = new bool[size, size];
+                for (int x = 0; x < size; x++)
+                    for (int z = 0; z < size; z++)
+                        wall[x, z] = true;
+                Carve(wall, new System.Random(Seed));
+                BuildFromWalls(wall, size, $"Assets/Scenes/MazeScene_{count}robots.unity", false);
+            }
+            finally { s_RobotCount = 1; }
+        }
+
+        // The first robot is already in the scene (BuildScene.BuildBase). Namespace it and add copies.
+        static void SetUpRobots(float cellPitch)
+        {
+            if (s_RobotCount <= 1) return;
+            var first = Object.FindFirstObjectByType<TerrainNavigation.Kinematics.AGVController>();
+            if (first == null) { Debug.LogWarning("BuildMazeScene: no robot found for multi-robot setup."); return; }
+            var rootGo = first.transform.root.gameObject;
+            var prefab = PrefabUtility.GetCorrespondingObjectFromSource(rootGo);
+            for (int k = 0; k < s_RobotCount; k++)
+            {
+                var robot = rootGo;
+                if (k > 0)
+                {
+                    robot = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    robot.transform.position = rootGo.transform.position + new Vector3(k * cellPitch, 0, 0);
+                }
+                robot.name = $"robot{k}";
+                var ns = robot.GetComponent<TerrainNavigation.Core.RobotNamespace>();
+                if (ns == null) ns = robot.AddComponent<TerrainNavigation.Core.RobotNamespace>();
+                ns.robotNamespace = $"robot{k}";
+            }
+        }
+
         [MenuItem("TerrainNav/Build Maze Scene")]
         public static void CreateMazeScene()
         {
@@ -133,6 +183,8 @@ namespace TerrainNavigation.EditorTools
                     box.isStatic = true;
                 }
             }
+
+            SetUpRobots(CellChars * Char);
 
             // Visual-only goal marker in the far corner cell (no collider, so the lidar ignores it).
             int goalChar = (Cells - 1) * CellChars + 2;

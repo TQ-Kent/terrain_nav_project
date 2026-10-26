@@ -7,6 +7,7 @@ using Unity.Robotics.Core;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine.Serialization;
+using TerrainNavigation.Core;
 
 namespace TerrainNavigation.Sensors
 {
@@ -36,6 +37,8 @@ namespace TerrainNavigation.Sensors
         float m_CurrentScanAngleStart;
         float m_CurrentScanAngleEnd;
         ROSConnection m_Ros;
+        string m_Topic;
+        string m_FrameId;
         double m_TimeNextScanSeconds = -1;
         int m_NumMeasurementsTaken;
         List<float> ranges = new List<float>();
@@ -46,7 +49,9 @@ namespace TerrainNavigation.Sensors
         protected virtual void Start()
         {
             m_Ros = ROSConnection.GetOrCreateInstance();
-            m_Ros.RegisterPublisher<LaserScanMsg>(topic);
+            m_Topic = RobotNamespace.Topic(this, topic);
+            m_FrameId = RobotNamespace.Frame(this, FrameId);
+            m_Ros.RegisterPublisher<LaserScanMsg>(m_Topic);
 
             m_CurrentScanAngleStart = ScanAngleStartDegrees;
             m_CurrentScanAngleEnd = ScanAngleEndDegrees;
@@ -89,7 +94,7 @@ namespace TerrainNavigation.Sensors
             {
                 header = new HeaderMsg
                 {
-                    frame_id = FrameId,
+                    frame_id = m_FrameId,
                     stamp = new TimeMsg
                     {
                         sec = timestamp.Seconds,
@@ -107,7 +112,7 @@ namespace TerrainNavigation.Sensors
                 ranges = ranges.ToArray(),
             };
 
-            m_Ros.Publish(topic, msg);
+            m_Ros.Publish(m_Topic, msg);
 
             m_NumMeasurementsTaken = 0;
             ranges.Clear();

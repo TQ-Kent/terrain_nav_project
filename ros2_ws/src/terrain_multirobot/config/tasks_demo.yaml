@@ -1,0 +1,7 @@
+# Task points in the map frame (= robot 0 start frame; x forward, y left). Cell pitch is 2 m,
+# goal cell of the seed-42 maze is about (10, -10). Points are cell centres of the 6x6 maze.
+tasks:
+  - {x: 4.0, y: -2.0, value: 100.0, discount: 0.98}
+  - {x: 8.0, y: -4.0, value: 100.0, discount: 0.98}
+  - {x: 2.0, y: -8.0, value: 100.0, discount: 0.98}
+  - {x: 10.0, y: -10.0, value: 150.0, discount: 0.98}

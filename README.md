@@ -41,7 +41,7 @@ Planners: `GridBased`, `Smac2D`, `SmacHybrid`, `ThetaStar`. Controllers: `Follow
 - [`docs/SESSION_2026-10-19.md`](docs/SESSION_2026-10-19.md): Unity stall investigation: findings, the `profile:=reliable` setup (5/5 runs), results, gotchas, next ideas.
 - [`docs/PLANNING_COMPARISON.md`](docs/PLANNING_COMPARISON.md): planner compute time here vs published figures and similar projects.
 - [`docs/GOVERNOR.md`](docs/GOVERNOR.md): adaptive speed governor (research prototype, off by default): design, parameters, tests, benchmark, results.
-- [`docs/MULTIROBOT_PREP.md`](docs/MULTIROBOT_PREP.md): single-robot assumptions and a suggested order for the multi-robot upgrade.
+- [`docs/MULTIROBOT.md`](docs/MULTIROBOT.md): multi-robot CBBA task allocation in Unity: status, design, how to run.
 - [`docs/SYSTEM_REVIEW.md`](docs/SYSTEM_REVIEW.md): how the maze test works and where the time is lost.
 
 ## Known limitations

@@ -207,3 +207,37 @@ def nav2_params(base_path, speed, tolerance=None, tag='', governor_enabled=False
 
 def merged(config_path, overrides=''):
     return apply_overrides(copy.deepcopy(load(config_path)), overrides)
+
+
+def namespace_params(params_path, ns, tag=''):
+    """Rewrite a Nav2 params file so it works for one robot under namespace `ns` in a shared TF tree.
+
+    - base frames get the robot prefix (`base_link` -> `robot0/base_link`); `map` and `odom` stay shared
+    - absolute topics become relative (`/scan` -> `scan`) so they resolve to /<ns>/...
+    - the global costmap static layer reads the one shared `/map`
+    """
+    with open(params_path) as f:
+        p = yaml.safe_load(f)
+    frame_keys = ('robot_base_frame', 'base_frame_id', 'base_frame')
+    topic_keys = ('topic', 'footprint_topic', 'odom_topic', 'scan_topic')
+
+    def walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k in frame_keys and v in ('base_link', 'base_footprint'):
+                    node[k] = f'{ns}/{v}'
+                elif k in topic_keys and isinstance(v, str) and v.startswith('/'):
+                    node[k] = v.lstrip('/')
+                else:
+                    walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(p)
+    static = p['global_costmap']['global_costmap']['ros__parameters'].setdefault('static_layer', {})
+    static['map_topic'] = '/map'
+    out = os.path.join(tempfile.gettempdir(), f'terrain_nav_params_{ns}_{os.getpid()}{tag}.yaml')
+    with open(out, 'w') as f:
+        yaml.safe_dump(p, f, sort_keys=False)
+    return out
