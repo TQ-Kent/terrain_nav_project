@@ -54,7 +54,7 @@ namespace TerrainNavigation.EditorTools
             rosTestGo.AddComponent<ROSTestPublisher>();
         }
 
-        public static void SaveScene(string path)
+        public static void SaveScene(string path, bool setAsBuildScene = true)
         {
             if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
             {
@@ -63,8 +63,9 @@ namespace TerrainNavigation.EditorTools
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), path);
 
             // Set as active scene in Build Settings
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true) };
-            Debug.Log(path + " created and set in Build Settings successfully!");
+            if (setAsBuildScene)
+                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true) };
+            Debug.Log(path + (setAsBuildScene ? " created and set in Build Settings successfully!" : " created (Build Settings unchanged)."));
         }
     }
 }

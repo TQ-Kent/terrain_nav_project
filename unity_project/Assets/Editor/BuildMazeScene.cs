@@ -28,6 +28,65 @@ namespace TerrainNavigation.EditorTools
             var rng = new System.Random(Seed);
             Carve(wall, rng);
 
+            BuildFromWalls(wall, size, "Assets/Scenes/MazeScene.unity", true);
+        }
+
+        // Builds a scene from a layout text file written by tools/gen_maze.py (# = wall, 0.5 m per
+        // character, top row = far z). Headless and Unity then run the identical maze, including
+        // the obstacle blocks added by --profile.
+        [MenuItem("TerrainNav/Build Maze Scene From Layout...")]
+        public static void CreateFromLayoutDialog()
+        {
+            var path = EditorUtility.OpenFilePanel("Maze layout", "tools/mazes", "txt");
+            if (string.IsNullOrEmpty(path)) return;
+            BuildFromLayout(path, SceneNameFor(path));
+        }
+
+        // Batch mode: Unity -batchmode -quit -projectPath unity_project
+        //   -executeMethod TerrainNavigation.EditorTools.BuildMazeScene.BuildFromCommandLine
+        //   -layout /abs/maze.txt [-scene Assets/Scenes/Maze_name.unity]
+        public static void BuildFromCommandLine()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            string layout = null, scene = null;
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i] == "-layout") layout = args[i + 1];
+                if (args[i] == "-scene") scene = args[i + 1];
+            }
+            if (layout == null) { Debug.LogError("BuildMazeScene: -layout <file> is required."); EditorApplication.Exit(1); return; }
+            scene ??= SceneNameFor(layout);
+            BuildFromLayout(layout, scene);
+        }
+
+        // maze_mixed_s205.txt -> Assets/Scenes/Maze_mixed_s205.unity
+        static string SceneNameFor(string layoutPath)
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(layoutPath);
+            if (name.StartsWith("maze_")) name = name.Substring(5);
+            return "Assets/Scenes/Maze_" + name + ".unity";
+        }
+
+        public static void BuildFromLayout(string layoutPath, string scenePath)
+        {
+            var rows = new List<string>();
+            foreach (var line in System.IO.File.ReadAllLines(layoutPath))
+                if (line.Length > 0 && !line.StartsWith("//")) rows.Add(line);
+            int size = Cells * CellChars + 1;
+            if (rows.Count != size)
+                throw new System.Exception($"Layout needs {size} rows, found {rows.Count}: {layoutPath}");
+            var wall = new bool[size, size];
+            for (int r = 0; r < size; r++)
+            {
+                if (rows[r].Length < size)
+                    throw new System.Exception($"Layout row {r} has {rows[r].Length} characters, need {size}.");
+                for (int x = 0; x < size; x++) wall[x, size - 1 - r] = rows[r][x] == '#';
+            }
+            BuildFromWalls(wall, size, scenePath);
+        }
+
+        static void BuildFromWalls(bool[,] wall, int size, string scenePath, bool setAsBuildScene = false)
+        {
             // World position of a character centre; cell (0,0) is centred on the origin (robot start).
             float Pos(int c) => (c + 0.5f) * Char - 2.5f * Char;
             float mazeSize = size * Char;
@@ -47,8 +106,12 @@ namespace TerrainNavigation.EditorTools
             if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
                 AssetDatabase.CreateFolder("Assets", "Scenes");
             var root = new GameObject("Maze");
-            var material = new Material(Shader.Find("Standard")) { color = new Color(0.55f, 0.55f, 0.6f) };
-            AssetDatabase.CreateAsset(material, "Assets/Scenes/MazeWall.mat");
+            var material = AssetDatabase.LoadAssetAtPath<Material>("Assets/Scenes/MazeWall.mat");
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Standard")) { color = new Color(0.55f, 0.55f, 0.6f) };
+                AssetDatabase.CreateAsset(material, "Assets/Scenes/MazeWall.mat");
+            }
 
             // Merge horizontal runs of wall cells into one box each to keep the object count low.
             int boxes = 0;
@@ -85,7 +148,7 @@ namespace TerrainNavigation.EditorTools
             if (agv != null) agv.gameObject.AddComponent<TerrainNavigation.Tools.RunTracker>().goal = goal.transform;
             else Debug.LogWarning("BuildMazeScene: no AGVController found; RunTracker not added.");
 
-            BuildScene.SaveScene("Assets/Scenes/MazeScene.unity");
+            BuildScene.SaveScene(scenePath, setAsBuildScene);
 
             // Unity (x right, z forward) -> ROS (x forward, y left): ros_x = z, ros_y = -x.
             Debug.Log($"Maze: {boxes} walls, {mazeSize} m square, robot start (ROS) 0,0. " +
