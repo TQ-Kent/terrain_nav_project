@@ -1,0 +1,60 @@
+# Defaults for speed_governor. terrain_nav_bringup passes v_max / accel / omega_max from
+# config/maze_test.yaml (speed.*) so the governor cap always equals the controller cap;
+# override anything else with  set:=governor.<key>=<value>  in the maze launch.
+speed_governor:
+  ros__parameters:
+    use_sim_time: true
+    cmd_in_topic: cmd_vel_smoothed      # velocity_smoother output
+    cmd_out_topic: cmd_vel_governed     # collision_monitor input when the governor is enabled
+    final_cmd_topic: cmd_vel            # robot command, observed for diagnostics only
+    plan_topic: received_global_plan
+    costmap_topic: local_costmap/costmap
+    scan_topic: scan
+    base_frame: base_link
+    rate_hz: 20.0
+    cmd_timeout: 0.5
+    tf_timeout: 0.5
+    v_max: 0.5
+    max_reverse: 0.1
+    accel: 1.5
+    decel: 1.5
+    emergency_decel: 3.0
+    min_speed: 0.05
+    omega_min_ratio: 0.5
+    recovery_cycles: 10
+    # slow until the robot has left the start cell (walls are unmapped there); 0 disables
+    startup_speed: 0.3
+    startup_distance: 1.5
+    # curvature
+    a_lat_max: 0.6
+    kappa_eps: 0.001
+    omega_max: 1.5
+    curve_preview_decel: 1.0
+    path_spacing: 0.1
+    smooth_window: 5
+    curvature_k: 3
+    curve_lookahead: 2.0
+    path_max_offset: 1.0
+    # clearance
+    robot_radius: 0.22
+    occupied_threshold: 100
+    unknown_is_occupied: true
+    clearance_min: 0.03
+    clearance_full: 0.30
+    clearance_range: 1.0
+    clearance_half_angle: 0.6          # rad each side of heading (~35 deg); side walls are not 'ahead'
+    clearance_floor_speed: 0.15        # m/s: clearance slows, never freezes; the braking bound handles obstacles in the way
+    # braking: measured in headless sim, see docs/results/braking_headless.json (Unity not measured)
+    reaction_time: 0.30
+    braking_decel: 1.5
+    safety_margin: 0.05
+    look_ahead_max: 2.0
+    # perception confidence
+    scan_warn: 0.3
+    scan_timeout: 1.0
+    costmap_warn: 1.0
+    costmap_timeout: 3.0
+    min_forward_fraction: 0.5
+    full_forward_fraction: 0.9
+    scan_forward_half_angle: 0.8
+    min_valid_scan_fraction: 0.2
